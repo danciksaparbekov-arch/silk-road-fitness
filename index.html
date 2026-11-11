@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light dark}body{margin:0}</style>
+<title>Шёлковый путь</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Oswald:wght@500;600&display=swap">
+<style>
+/* Концепция: навигационная карта похода. Бирюзовый = завоёвано, янтарь = текущая цель, серо-зелёный = впереди. */
+:root{
+  --bg:#eef1f0; --panel:#f8faf9; --ink:#17282b; --muted:#566b6f; --line:#cfd9d7;
+  --conq:#0e6a68; --conq-ink:#ffffff; --cur:#b8690a; --cur-soft:#f6e6cb; --lock:#9fb0ae;
+  --sea:#e2ebea; --warn:#a8362a; --ok:#1f7a45;
+  --display:'Oswald','Arial Narrow',Impact,sans-serif; --body:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1819; --panel:#152325; --ink:#e4eeec; --muted:#95aaad; --line:#27393b;
+    --conq:#4cc2b5; --conq-ink:#0b1b1a; --cur:#eaa646; --cur-soft:#3a2c12; --lock:#44585a;
+    --sea:#112022; --warn:#ee7b6d; --ok:#5cc98a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1819; --panel:#152325; --ink:#e4eeec; --muted:#95aaad; --line:#27393b;
+  --conq:#4cc2b5; --conq-ink:#0b1b1a; --cur:#eaa646; --cur-soft:#3a2c12; --lock:#44585a;
+  --sea:#112022; --warn:#ee7b6d; --ok:#5cc98a; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:.02em;margin:0;text-wrap:balance}
+h1{font-size:clamp(30px,6vw,44px);text-transform:uppercase;line-height:1.05}
+h2{font-size:20px;text-transform:uppercase}
+h3{font-size:16px;text-transform:uppercase}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+.chip{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:3px 10px;border-radius:99px;background:var(--panel)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));border-block:1px solid var(--line)}
+.stat{padding:12px 16px;border-left:1px solid var(--line);min-width:0}
+.stat:first-child{border-left:0;padding-left:0}
+.stat .v{font-family:var(--display);font-size:28px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat .l{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.pips{display:flex;gap:3px;margin-top:6px}
+.pip{width:12px;height:12px;border:1.5px solid var(--lock);border-radius:2px}
+.pip.on{background:var(--conq);border-color:var(--conq)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}
+.card>h2{margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}.stat:nth-child(odd){border-left:0;padding-left:0}}
+.col{display:flex;flex-direction:column;gap:20px;min-width:0}
+svg.map{display:block;width:100%;height:auto;background:var(--sea);border-radius:6px;border:1px solid var(--line)}
+svg.map text{font-family:var(--display);font-weight:600;font-size:15px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+svg.map g.node{cursor:pointer}
+svg.map g.node:focus-visible{outline:none}
+svg.map g.node:focus-visible .focus{stroke:var(--ink);stroke-width:2}
+.info{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.info .top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.info .name{font-family:var(--display);font-size:26px;font-weight:600;text-transform:uppercase;line-height:1.1}
+.pill{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.pill.conq{background:var(--conq);color:var(--conq-ink);border-color:var(--conq)}
+.pill.cur{background:var(--cur-soft);color:var(--cur);border-color:var(--cur)}
+.note{color:var(--muted);font-size:14px;margin:0}
+.bar{height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--cur)}
+.bar.done>i{background:var(--conq)}
+.barlbl{display:flex;justify-content:space-between;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.boss{border:1.5px dashed var(--cur);background:var(--cur-soft);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.boss b{color:var(--cur)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+input,select{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-height:40px;min-width:0;max-width:100%}
+input[type=number]{width:96px;font-variant-numeric:tabular-nums}
+button{font:inherit;font-weight:700;font-size:14px;min-height:40px;padding:8px 14px;border-radius:6px;border:1px solid var(--conq);background:var(--conq);color:var(--conq-ink);cursor:pointer}
+button.ghost{background:transparent;color:var(--conq)}
+button.amber{background:var(--cur);border-color:var(--cur);color:var(--panel)}
+button.warn{background:transparent;border-color:var(--warn);color:var(--warn)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cur);outline-offset:2px}
+ul.clean,ol.clean{list-style:none;margin:0;padding:0}
+.draft li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.draft li button{min-height:28px;padding:0 8px;font-size:16px;line-height:1}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tag{font-size:12px;padding:2px 8px;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
+.tag.good{color:var(--ok);border-color:var(--ok)}
+.tag.bad{color:var(--warn);border-color:var(--warn)}
+.total{font-family:var(--display);font-size:22px;font-variant-numeric:tabular-nums}
+.lad{padding:10px 0;border-top:1px solid var(--line)}
+.lad:first-of-type{border-top:0;padding-top:0}
+.tiers{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.tiers li{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:14px}
+.tiers .dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--lock);flex:none}
+.tiers .done .dot{background:var(--conq);border-color:var(--conq)}
+.tiers .next .dot{border-color:var(--cur)}
+.tiers .lock{color:var(--muted)}
+.tiers .k{color:var(--muted);font-variant-numeric:tabular-nums}
+.tiers button{min-height:30px;padding:2px 10px;font-size:13px}
+.route{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+@media (max-width:760px){.route{grid-template-columns:1fr}}
+.route li{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.route .n{font-family:var(--display);font-weight:600;color:var(--muted)}
+.route .cur .n,.route .cur b{color:var(--cur)}
+.route .conq .n{color:var(--conq)}
+.route .s{color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
+.log li{display:grid;grid-template-columns:78px 1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.log .d{color:var(--muted);font-variant-numeric:tabular-nums}
+.log .p{font-variant-numeric:tabular-nums;font-weight:700;color:var(--conq)}
+.toast{min-height:22px;font-size:14px;font-weight:700;color:var(--conq)}
+.cardq{border:1.5px solid var(--line);border-radius:6px;padding:12px;background:var(--bg);display:flex;flex-direction:column;gap:6px}
+.cardq h3{color:var(--cur)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.empty{color:var(--muted);font-size:14px;margin:0}
+@media (prefers-reduced-motion:no-preference){.bar>i{transition:width .5s ease}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Кампания силы · 12 регионов · от Иссык-Куля до Лиссабона</div>
+      <h1>Шёлковый путь</h1>
+    </div>
+    <span class="chip" id="sync">Сохранено на этом устройстве</span>
+  </header>
+
+  <section class="stats" id="stats" aria-label="Сводка"></section>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <section class="card">
+    <h2>Карта похода</h2>
+    <div id="mapbox"></div>
+    <div class="info" id="info"></div>
+  </section>
+
+  <div class="grid2">
+    <div class="col">
+      <section class="card">
+        <h2>Поход</h2>
+        <p class="note" style="margin-bottom:10px">Добавляй подходы, затем заверши поход. Очки = повторения × сила упражнения.</p>
+        <div class="row">
+          <label class="f" for="lad">Упражнение<select id="lad"></select></label>
+          <label class="f" for="tier">Уровень<select id="tier"></select></label>
+          <label class="f" for="reps">Повторы<input id="reps" type="number" min="1" max="300" inputmode="numeric" placeholder="10"></label>
+          <button id="addset" class="ghost" type="button">Добавить подход</button>
+        </div>
+        <ul class="clean draft" id="draft" style="margin-top:12px"></ul>
+        <div id="preview"></div>
+      </section>
+
+      <section class="card">
+        <h2>Кузница</h2>
+        <p class="note" style="margin-bottom:12px">Новый уровень упражнения открывается после теста. Сложный вариант даёт больше очков за повтор. Берись за то, что есть дома: рюкзак, стол, резинка, турник.</p>
+        <div id="forge"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card">
+        <h2>Лагерь</h2>
+        <p class="note">Калории и белок в норме за день = 1 провиант. Поход тратит 1. Без провианта армия голодна и очки режутся вдвое.</p>
+        <div class="pips" id="pips" style="margin:10px 0"></div>
+        <div class="row">
+          <button id="foodToday" type="button">Питание сегодня в норме</button>
+          <button id="foodYest" class="ghost" type="button">За вчера</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Флот · вес</h2>
+        <p class="note">Каждый набранный килограмм от стартового веса даёт +100 очков.</p>
+        <div class="row" style="margin-top:10px">
+          <label class="f" for="wt">Вес, кг<input id="wt" type="number" step="0.1" min="30" max="200" inputmode="decimal" placeholder="62.0"></label>
+          <button id="wsave" type="button">Записать</button>
+        </div>
+        <p class="note" id="wnote" style="margin-top:8px"></p>
+      </section>
+
+      <section class="card">
+        <h2>Карта недели</h2>
+        <div id="weekcard"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>Маршрут</h2>
+    <ol class="clean route" id="route"></ol>
+  </section>
+
+  <section class="card">
+    <h2>Журнал</h2>
+    <ul class="clean log" id="log"></ul>
+    <div style="margin-top:14px" id="resetbox"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- Данные кампании ---------- */
+var REGIONS=[
+ {n:'Иссык-Куль',note:'Тёплое озеро в горах. Отсюда всё начинается.',str:200},
+ {n:'Алматы',note:'Город под склонами Заилийского Алатау.',str:240},
+ {n:'Ташкент',note:'Ворота Ферганы. Перевал держит страж.',str:280,boss:{what:'Отжимания подряд без остановки',unit:'повт.',target:20}},
+ {n:'Самарканд',note:'Регистан и синие купола.',str:340},
+ {n:'Бухара',note:'Старые караван-сараи и торговые купола.',str:400},
+ {n:'Мерв',note:'Руины посреди Каракума. Перевал держит страж.',str:460,boss:{what:'Планка без перерыва',unit:'с',target:90}},
+ {n:'Исфахан',note:'Площадь Накше-Джахан.',str:540},
+ {n:'Тебриз',note:'Самый большой в мире крытый базар.',str:620},
+ {n:'Стамбул',note:'Мост между Азией и Европой. Перевал держит страж.',str:700,boss:{what:'Отжимания подряд без остановки',unit:'повт.',target:30}},
+ {n:'Рим',note:'Конец Великой дороги на суше.',str:800},
+ {n:'Париж',note:'Почти у океана.',str:900},
+ {n:'Лиссабон',note:'Край света. Последний страж.',str:1040,boss:{what:'Отжимания подряд без остановки',unit:'повт.',target:40}}
+];
+var LADDERS=[
+ {id:'push',name:'Отжимания',tiers:[
+  {n:'Классические',k:1},
+  {n:'Узкие (бриллиант)',k:1.3,r:12},
+  {n:'Ноги на возвышении',k:1.5,r:10},
+  {n:'Пауза 2 с внизу',k:1.8,r:8},
+  {n:'Лучник',k:2.4,r:8}]},
+ {id:'squat',name:'Ноги',tiers:[
+  {n:'Приседания',k:0.5},
+  {n:'Выпады на месте',k:0.7,r:15},
+  {n:'Болгарские сплит-приседания (на ногу)',k:1.1,r:12},
+  {n:'Пистолет с опорой (на ногу)',k:1.8,r:10}]},
+ {id:'pull',name:'Тяга и спина',tiers:[
+  {n:'Тяга рюкзака в наклоне',k:1.2},
+  {n:'Подтягивания под столом',k:2,r:12},
+  {n:'Подтягивания с резинкой',k:2.5,r:10},
+  {n:'Подтягивания',k:3.5,r:8}]},
+ {id:'core',name:'Корпус',tiers:[
+  {n:'Скручивания',k:0.5},
+  {n:'Подъём ног лёжа',k:0.8,r:15},
+  {n:'Планка (10 с = 1 повтор)',k:1,r:15},
+  {n:'Планка с касанием плеч (10 с = 1)',k:1.4,req:'планка 3×60 с'}]}
+];
+var CARDS=[
+ {t:'Засада',x:'3 подхода отжиманий до отказа.',p:50},
+ {t:'Союзник',x:'Проведи тренировку до 12:00.',p:40},
+ {t:'Осадная башня',x:'Планка: 3 подхода на максимум.',p:45},
+ {t:'Разведка',x:'15 минут растяжки или мобильности.',p:30},
+ {t:'Караван',x:'30 г белка в течение часа после тренировки.',p:35},
+ {t:'Кузница',x:'Сделай один подход в варианте следующего уровня.',p:60},
+ {t:'Лагерь',x:'Сон 8 часов подряд.',p:30},
+ {t:'Переход',x:'Прогулка 6000 шагов в день без тренировки.',p:30}
+];
+var PROV_MAX=7;
+
+/* ---------- Состояние ---------- */
+var KEY='silkroad.v1';
+function fresh(){return {v:1,updatedAt:0,region:0,progress:0,gatePassed:false,provisions:0,foodDays:[],trainDays:[],
+  unlocked:{push:0,squat:0,pull:0,core:0},startWeight:null,weight:null,weightKg:0,card:null,log:[],total:0};}
+function migrate(o){var f=fresh();if(!o||typeof o!=='object')return f;
+  for(var k in f){if(o[k]!==undefined)f[k]=o[k];}
+  f.unlocked=Object.assign({push:0,squat:0,pull:0,core:0},o.unlocked||{});return f;}
+function loadLocal(){try{var s=localStorage.getItem(KEY);if(s)return migrate(JSON.parse(s));}catch(e){}return fresh();}
+var S=loadLocal();
+var draft=[];
+var viewIdx=null;
+var dbRef=null,dbBusy=false,dbDirty=false,dbTimer=null;
+
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function pad(n){return (n<10?'0':'')+n;}
+function ymd(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function addDays(d,n){var x=new Date(d.getTime());x.setDate(x.getDate()+n);return x;}
+function today(){return ymd(new Date());}
+function weekKey(){var x=new Date();x.setDate(x.getDate()-((x.getDay()+6)%7));return ymd(x);}
+function num(n){return Math.round(n);}
+
+function setSync(mode){$('sync').textContent=mode==='cloud'?'Сохранено в облаке':'Сохранено на этом устройстве';}
+function toast(t){$('toast').textContent=t;}
+function addLog(k,t,p){S.log.unshift({d:today(),k:k,t:t,p:p||0});if(S.log.length>100)S.log.length=100;}
+
+function save(){
+  S.updatedAt=Date.now();
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  if(dbRef){dbDirty=true;clearTimeout(dbTimer);dbTimer=setTimeout(flushDb,700);}
+}
+function flushDb(){
+  if(dbBusy||!dbDirty||!dbRef)return;
+  dbBusy=true;dbDirty=false;
+  dbRef.set({state:S}).then(function(){setSync('cloud');},function(){setSync('local');}).then(function(){dbBusy=false;if(dbDirty)flushDb();});
+}
+async function initDb(){
+  try{
+    if(!window.claude||!window.claude.use)return;
+    var user=await window.claude.use('user');var db=await window.claude.use('db');
+    if(!user||!db)return;
+    var id=await user.id();if(!id)return;
+    var ref=db.doc('data/users/'+id+'/profile');
+    var snap=await ref.get();
+    dbRef=ref;
+    var remote=snap.exists?snap.data():null;
+    if(remote&&remote.state&&(remote.state.updatedAt||0)>(S.updatedAt||0)){
+      S=migrate(remote.state);
+      try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+      render();setSync('cloud');
+    }else if(S.updatedAt>0){dbDirty=true;flushDb();}
+    else setSync('cloud');
+  }catch(e){dbRef=null;}
+}
+
+/* ---------- Игровая логика ---------- */
+function resolve(){
+  var out=[];
+  while(S.region<REGIONS.length){
+    var r=REGIONS[S.region];
+    if(S.progress<r.str)break;
+    if(r.boss&&!S.gatePassed)break;
+    S.progress-=r.str;S.gatePassed=false;
+    out.push(r.n);addLog('region','Завоёван регион: '+r.n,0);
+    S.region++;
+  }
+  if(S.region>=REGIONS.length)S.progress=0;
+  return out;
+}
+function applyPoints(p){S.total+=p;S.progress+=p;return resolve();}
+function announce(msg,conq){
+  if(conq.length)msg+=' Завоёван: '+conq.join(', ')+'.';
+  var gate=S.region<REGIONS.length&&REGIONS[S.region].boss&&!S.gatePassed&&S.progress>=REGIONS[S.region].str;
+  if(gate)msg+=' Гарнизон сломлен, впереди страж.';
+  if(S.region>=REGIONS.length)msg+=' Кампания пройдена!';
+  toast(msg);
+}
+function calcMods(){
+  var td=new Set(S.trainDays),t=today(),y=ymd(addDays(new Date(),-1)),y2=ymd(addDays(new Date(),-2)),y3=ymd(addDays(new Date(),-3));
+  var m=1,tags=[],spend=false;
+  if(S.provisions>0){spend=true;tags.push({t:'Провиант −1',c:'good'});}
+  else{m*=0.5;tags.push({t:'Голод ×0.5',c:'bad'});}
+  if(td.has(t)){m*=0.8;tags.push({t:'Второй поход за день ×0.8',c:'bad'});}
+  else if(td.has(y)&&td.has(y2)){m*=0.8;tags.push({t:'Третий день подряд ×0.8',c:'bad'});}
+  else if(!td.has(y)&&(td.has(y2)||td.has(y3))){m*=1.1;tags.push({t:'Отдохнувшая армия ×1.1',c:'good'});}
+  return {m:m,tags:tags,spend:spend};
+}
+function rawDraft(){return draft.reduce(function(a,s){return a+s.k*s.reps;},0);}
+function weekSessions(){
+  var wk=weekKey(),n=0;
+  S.trainDays.forEach(function(d){if(d>=wk)n++;});return n;
+}
+
+function addSet(){
+  var lad=LADDERS.filter(function(l){return l.id===$('lad').value;})[0];
+  var ti=parseInt($('tier').value,10);var reps=parseInt($('reps').value,10);
+  if(!lad||!(reps>0)){toast('Укажи число повторов.');return;}
+  var tr=lad.tiers[ti];
+  draft.push({lad:lad.id,name:tr.n,k:tr.k,reps:Math.min(reps,300)});
+  $('reps').value='';$('reps').focus();toast('');
+  renderSession();
+}
+function finishSession(){
+  var raw=rawDraft();if(!draft.length||raw<=0)return;
+  var md=calcMods();
+  var pts=num(raw*md.m);
+  if(md.spend)S.provisions--;
+  var t=today();if(S.trainDays.indexOf(t)<0){S.trainDays.push(t);if(S.trainDays.length>60)S.trainDays.shift();}
+  var sets=draft.length;draft=[];
+  addLog('session','Поход: '+sets+' подх., множитель ×'+md.m.toFixed(2),pts);
+  var conq=applyPoints(pts);
+  save();announce('Поход завершён: +'+pts+' очков.',conq);render();
+}
+function markFood(offset){
+  var d=ymd(addDays(new Date(),offset));
+  if(S.foodDays.indexOf(d)>=0){toast('Этот день уже засчитан.');return;}
+  if(S.provisions>=PROV_MAX){toast('Мешок полон: '+PROV_MAX+' из '+PROV_MAX+'. Сначала сходи в поход.');return;}
+  S.foodDays.push(d);if(S.foodDays.length>60)S.foodDays.shift();
+  S.provisions++;addLog('food','Провиант: '+(offset?'вчера':'сегодня'),0);
+  save();toast('Провиант +1.');render();
+}
+function saveWeight(){
+  var v=parseFloat(String($('wt').value).replace(',','.'));
+  if(!(v>=30&&v<=200)){toast('Введи вес в кг, например 62.5.');return;}
+  S.weight=v;if(S.startWeight==null)S.startWeight=v;
+  var kg=Math.floor(v-S.startWeight+1e-9),gain=0;
+  while(S.weightKg<kg){S.weightKg++;gain+=100;}
+  addLog('weight','Вес: '+v.toFixed(1)+' кг'+(gain?' (+'+gain/100+' кг от старта)':''),gain);
+  var conq=gain?applyPoints(gain):[];
+  save();$('wt').value='';
+  announce(gain?'Флот прибыл: +'+gain+' очков.':'Вес записан.',conq);render();
+}
+function drawCard(){
+  var c=CARDS[Math.floor(Math.random()*CARDS.length)];
+  S.card={wk:weekKey(),id:CARDS.indexOf(c),done:false};
+  save();render();
+}
+function claimCard(){
+  if(!S.card||S.card.done)return;
+  var c=CARDS[S.card.id];S.card.done=true;
+  addLog('card','Карта: '+c.t,c.p);
+  var conq=applyPoints(c.p);save();announce('Задание выполнено: +'+c.p+' очков.',conq);render();
+}
+function challengeBoss(){
+  var r=REGIONS[S.region];if(!r||!r.boss)return;
+  var v=parseFloat($('bossVal').value);
+  if(!(v>=0)){toast('Введи результат попытки.');return;}
+  if(v>=r.boss.target){
+    S.gatePassed=true;addLog('boss','Страж побеждён: '+r.n+' ('+v+' '+r.boss.unit+')',0);
+    var conq=resolve();save();announce('Страж побеждён!',conq);render();
+  }else{
+    toast('Не хватило: '+v+' из '+r.boss.target+' '+r.boss.unit+'. Потренируйся и попробуй снова.');
+  }
+}
+function unlockTier(id){
+  var l=LADDERS.filter(function(x){return x.id===id;})[0];
+  if(!l||S.unlocked[id]>=l.tiers.length-1)return;
+  S.unlocked[id]++;addLog('forge','Открыто: '+l.tiers[S.unlocked[id]].n,0);
+  save();toast('Новый уровень: '+l.tiers[S.unlocked[id]].n+'.');render();
+}
+
+/* ---------- Карта ---------- */
+var P=[{x:604,y:165}];
+REGIONS.forEach(function(_,i){P.push({x:558-i*44,y:165+Math.sin(i*0.95+0.5)*88});});
+function seg(i){
+  var p0=P[i-1]||P[i],p1=P[i],p2=P[i+1],p3=P[i+2]||P[i+1];
+  function f(v){return v.toFixed(1);}
+  return ' C'+f(p1.x+(p2.x-p0.x)/6)+' '+f(p1.y+(p2.y-p0.y)/6)+' '+f(p2.x-(p3.x-p1.x)/6)+' '+f(p2.y-(p3.y-p1.y)/6)+' '+f(p2.x)+' '+f(p2.y);
+}
+function pathTo(a,b){var d='M'+P[a].x+' '+P[a].y;for(var i=a;i<b;i++)d+=seg(i);return d;}
+function renderMap(){
+  var c=S.region,done=c>=REGIONS.length;
+  var s='<svg class="map" viewBox="0 0 660 330" role="group" aria-label="Карта маршрута от Иссык-Куля до Лиссабона">';
+  for(var gx=60;gx<660;gx+=90)s+='<line x1="'+gx+'" y1="0" x2="'+gx+'" y2="330" stroke="var(--line)" stroke-width="1" opacity=".6"/>';
+  for(var gy=55;gy<330;gy+=110)s+='<line x1="0" y1="'+gy+'" x2="660" y2="'+gy+'" stroke="var(--line)" stroke-width="1" opacity=".6"/>';
+  s+='<path d="'+pathTo(0,12)+'" fill="none" stroke="var(--lock)" stroke-width="3" stroke-dasharray="3 8" stroke-linecap="round"/>';
+  if(c>0)s+='<path d="'+pathTo(0,Math.min(c,12))+'" fill="none" stroke="var(--conq)" stroke-width="5" stroke-linecap="round"/>';
+  if(!done)s+='<path d="'+pathTo(c,c+1)+'" fill="none" stroke="var(--cur)" stroke-width="4" stroke-dasharray="2 7" stroke-linecap="round"/>';
+  s+='<circle cx="'+P[0].x+'" cy="'+P[0].y+'" r="7" fill="var(--conq)"/>';
+  var sel=viewIdx==null?(done?REGIONS.length-1:c):viewIdx;
+  REGIONS.forEach(function(r,i){
+    var p=P[i+1],st=i<c?'conq':(i===c?'cur':'lock'),boss=!!r.boss;
+    var fill=st==='conq'?'var(--conq)':'var(--panel)',stroke=st==='conq'?'var(--conq)':(st==='cur'?'var(--cur)':'var(--lock)');
+    var tx=st==='conq'?'var(--conq-ink)':(st==='cur'?'var(--cur)':'var(--muted)');
+    var shape=boss
+      ?'<polygon points="'+p.x+','+(p.y-21)+' '+(p.x+21)+','+p.y+' '+p.x+','+(p.y+21)+' '+(p.x-21)+','+p.y+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="3"/>'
+      :'<circle cx="'+p.x+'" cy="'+p.y+'" r="16" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(st==='cur'?4:3)+'"/>';
+    var ring=i===sel?'<circle class="focus" cx="'+p.x+'" cy="'+p.y+'" r="27" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="4 4"/>':'<circle class="focus" cx="'+p.x+'" cy="'+p.y+'" r="27" fill="none" stroke="none"/>';
+    s+='<g class="node" tabindex="0" role="button" data-i="'+i+'" aria-label="'+esc(r.n)+(boss?', перевал':'')+'">'+ring+shape+'<text x="'+p.x+'" y="'+p.y+'" fill="'+tx+'">'+(i+1)+'</text></g>';
+  });
+  s+='</svg><div class="small muted" style="margin-top:8px">Круг: регион. Ромб: перевал со стражем. Нажми на точку, чтобы увидеть детали.</div>';
+  $('mapbox').innerHTML=s;
+  renderInfo(sel);
+}
+function renderInfo(i){
+  var r=REGIONS[i],c=S.region,st=i<c?'conq':(i===c?'cur':'lock');
+  var h='<div class="top"><div class="name">'+(i+1)+'. '+esc(r.n)+'</div><span class="pill '+st+'">'+(st==='conq'?'Завоёван':(st==='cur'?'Текущая цель':'Впереди'))+'</span></div>';
+  h+='<p class="note">'+esc(r.note)+'</p>';
+  if(st==='conq'){h+='<div class="bar done"><i style="width:100%"></i></div><div class="barlbl"><span>Гарнизон разбит</span><span>'+r.str+'</span></div>';}
+  else if(st==='cur'){
+    var pr=Math.min(S.progress,r.str),pct=Math.round(pr/r.str*100),gate=r.boss&&!S.gatePassed&&S.progress>=r.str;
+    h+='<div class="bar"><i style="width:'+pct+'%"></i></div><div class="barlbl"><span>Гарнизон</span><span>'+pr+' / '+r.str+'</span></div>';
+    if(S.progress>r.str)h+='<div class="small muted">Запас очков после гарнизона: +'+(S.progress-r.str)+'. Он перейдёт в следующий регион.</div>';
+    if(gate){
+      h+='<div class="boss"><div><b>Страж перевала.</b> '+esc(r.boss.what)+', цель: '+r.boss.target+' '+r.boss.unit+'.</div>'+
+        '<div class="row"><label class="f" for="bossVal">Результат ('+r.boss.unit+')<input id="bossVal" type="number" min="0" inputmode="numeric"></label>'+
+        '<button class="amber" type="button" data-act="boss">Бросить вызов</button></div></div>';
+    }else if(r.boss){h+='<div class="small muted">Когда гарнизон падёт, выйдет страж: '+esc(r.boss.what).toLowerCase()+', цель '+r.boss.target+' '+r.boss.unit+'.</div>';}
+  }else{
+    h+='<div class="barlbl"><span>Гарнизон</span><span>'+r.str+'</span></div>';
+    if(r.boss)h+='<div class="small muted">Перевал: '+esc(r.boss.what).toLowerCase()+', цель '+r.boss.target+' '+r.boss.unit+'.</div>';
+  }
+  if(c>=REGIONS.length)h='<div class="boss" style="border-color:var(--conq);background:var(--bg)"><div><b style="color:var(--conq)">Кампания пройдена.</b> Все 12 регионов завоёваны. Сбрось карту внизу страницы, чтобы начать новый поход.</div></div>'+h;
+  $('info').innerHTML=h;
+}
+
+/* ---------- Остальные блоки ---------- */
+function renderStats(){
+  var c=Math.min(S.region+1,REGIONS.length);
+  $('stats').innerHTML=
+   '<div class="stat"><div class="l">Регион</div><div class="v">'+c+' / '+REGIONS.length+'</div></div>'+
+   '<div class="stat"><div class="l">Очки</div><div class="v">'+S.total+'</div></div>'+
+   '<div class="stat"><div class="l">Провиант</div><div class="v">'+S.provisions+' / '+PROV_MAX+'</div></div>'+
+   '<div class="stat"><div class="l">Походов за неделю</div><div class="v">'+weekSessions()+' / 3</div></div>';
+}
+function renderSession(){
+  var ls=$('lad'),prevL=ls.value||LADDERS[0].id;
+  ls.innerHTML=LADDERS.map(function(l){return '<option value="'+l.id+'">'+esc(l.name)+'</option>';}).join('');
+  ls.value=prevL;
+  var lad=LADDERS.filter(function(l){return l.id===ls.value;})[0],ts=$('tier'),prevT=ts.value;
+  ts.innerHTML=lad.tiers.slice(0,S.unlocked[lad.id]+1).map(function(t,i){return '<option value="'+i+'">'+esc(t.n)+' (×'+t.k+')</option>';}).join('');
+  if(prevT&&+prevT<=S.unlocked[lad.id])ts.value=prevT;else ts.value=String(S.unlocked[lad.id]);
+  $('draft').innerHTML=draft.length?draft.map(function(s,i){
+    return '<li><span>'+esc(s.name)+': '+s.reps+' × '+s.k+' = <b>'+num(s.reps*s.k)+'</b></span><button class="ghost" type="button" data-act="rmset" data-i="'+i+'" aria-label="Убрать подход">×</button></li>';
+  }).join(''):'<li class="muted">Подходов пока нет.</li>';
+  var raw=rawDraft(),md=calcMods();
+  var tags=md.tags.map(function(t){return '<span class="tag '+t.c+'">'+esc(t.t)+'</span>';}).join('');
+  $('preview').innerHTML='<div class="tags">'+tags+'</div>'+
+    '<div class="row" style="justify-content:space-between;align-items:center"><div class="total">≈ '+num(raw*md.m)+' <span class="small muted">очков</span></div>'+
+    '<button type="button" data-act="finish"'+(draft.length?'':' disabled')+'>Завершить поход</button></div>';
+}
+function renderForge(){
+  $('forge').innerHTML=LADDERS.map(function(l){
+    var u=S.unlocked[l.id];
+    return '<div class="lad"><h3>'+esc(l.name)+'</h3><ol class="clean tiers">'+l.tiers.map(function(t,i){
+      var cls=i<=u?'done':(i===u+1?'next':'lock');
+      var s='<li class="'+cls+'"><span class="dot"></span><span>'+esc(t.n)+'</span><span class="k">×'+t.k+'</span>';
+      if(cls==='next'){
+        var req=t.req||('3×'+t.r+' в «'+l.tiers[i-1].n+'»');
+        s+='<span class="small muted">Тест: '+esc(req)+'</span><button class="ghost" type="button" data-act="unlock" data-lad="'+l.id+'">Тест сдан</button>';
+      }
+      return s+'</li>';
+    }).join('')+'</ol></div>';
+  }).join('');
+}
+function renderCamp(){
+  var p='';for(var i=0;i<PROV_MAX;i++)p+='<span class="pip'+(i<S.provisions?' on':'')+'"></span>';
+  $('pips').innerHTML=p;$('pips').setAttribute('aria-label','Провиант: '+S.provisions+' из '+PROV_MAX);
+  var t=today(),y=ymd(addDays(new Date(),-1));
+  $('foodToday').disabled=S.foodDays.indexOf(t)>=0||S.provisions>=PROV_MAX;
+  $('foodToday').textContent=S.foodDays.indexOf(t)>=0?'Сегодня засчитано':'Питание сегодня в норме';
+  $('foodYest').disabled=S.foodDays.indexOf(y)>=0||S.provisions>=PROV_MAX;
+  var w=S.weight==null?'Старт не задан. Введи текущий вес, он станет точкой отсчёта.':
+    'Старт '+S.startWeight.toFixed(1)+' кг, сейчас '+S.weight.toFixed(1)+' кг ('+((S.weight-S.startWeight)>=0?'+':'')+(S.weight-S.startWeight).toFixed(1)+'). Килограммов в зачёте: '+S.weightKg+'.';
+  $('wnote').textContent=w;
+}
+function renderWeekCard(){
+  var el=$('weekcard');
+  if(!S.card||S.card.wk!==weekKey()){
+    el.innerHTML='<p class="note" style="margin-bottom:10px">Раз в неделю можно вытянуть карту события с бонусным заданием.</p><button class="amber" type="button" data-act="draw">Вытянуть карту</button>';return;
+  }
+  var c=CARDS[S.card.id];
+  el.innerHTML='<div class="cardq"><h3>'+esc(c.t)+'</h3><div>'+esc(c.x)+'</div><div class="small muted">Награда: +'+c.p+' очков</div>'+
+   (S.card.done?'<div class="small" style="color:var(--ok);font-weight:700">Выполнено на этой неделе</div>':'<div><button type="button" data-act="claim">Задание выполнено</button></div>')+'</div>';
+}
+function renderRoute(){
+  $('route').innerHTML=REGIONS.map(function(r,i){
+    var st=i<S.region?'conq':(i===S.region?'cur':'lock');
+    var lbl=st==='conq'?'готово':(st==='cur'?Math.min(S.progress,r.str)+' / '+r.str:String(r.str));
+    return '<li class="'+st+'"><span class="n">'+(i+1)+'</span><span><b>'+esc(r.n)+'</b>'+(r.boss?' <span class="pill">перевал</span>':'')+'</span><span class="s">'+lbl+'</span></li>';
+  }).join('');
+}
+function fmtDate(d){var a=d.split('-');return a[2]+'.'+a[1];}
+function renderLog(){
+  var l=S.log.slice(0,8);
+  $('log').innerHTML=l.length?l.map(function(e){
+    return '<li><span class="d">'+fmtDate(e.d)+'</span><span>'+esc(e.t)+'</span><span class="p">'+(e.p?'+'+e.p:'')+'</span></li>';
+  }).join(''):'<li class="muted">Журнал пуст. Первый поход откроет Иссык-Куль.</li>';
+  $('resetbox').innerHTML='<button class="warn" type="button" data-act="reset1">Сбросить кампанию</button>';
+}
+function render(){renderStats();renderMap();renderSession();renderForge();renderCamp();renderWeekCard();renderRoute();renderLog();}
+
+/* ---------- События ---------- */
+document.addEventListener('click',function(e){
+  var node=e.target.closest('g.node');
+  if(node){viewIdx=parseInt(node.getAttribute('data-i'),10);renderMap();return;}
+  var b=e.target.closest('[data-act]');if(!b)return;
+  var a=b.getAttribute('data-act');
+  if(a==='finish')finishSession();
+  else if(a==='rmset'){draft.splice(parseInt(b.getAttribute('data-i'),10),1);renderSession();}
+  else if(a==='unlock')unlockTier(b.getAttribute('data-lad'));
+  else if(a==='boss')challengeBoss();
+  else if(a==='draw')drawCard();
+  else if(a==='claim')claimCard();
+  else if(a==='reset1'){$('resetbox').innerHTML='<div class="row" style="align-items:center"><span class="small">Весь прогресс будет удалён. Продолжить?</span><button class="warn" type="button" data-act="reset2">Да, сбросить</button><button class="ghost" type="button" data-act="reset0">Отмена</button></div>';}
+  else if(a==='reset0')renderLog();
+  else if(a==='reset2'){S=fresh();draft=[];viewIdx=null;save();toast('Карта сброшена. Новый поход начинается.');render();}
+});
+document.addEventListener('keydown',function(e){
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('g.node')){e.preventDefault();viewIdx=parseInt(e.target.getAttribute('data-i'),10);renderMap();var n=document.querySelector('g.node[data-i="'+viewIdx+'"]');if(n)n.focus();}
+  if(e.key==='Enter'&&e.target.id==='reps')addSet();
+  if(e.key==='Enter'&&e.target.id==='wt')saveWeight();
+});
+$('addset').addEventListener('click',addSet);
+$('lad').addEventListener('change',renderSession);
+$('foodToday').addEventListener('click',function(){markFood(0);});
+$('foodYest').addEventListener('click',function(){markFood(-1);});
+$('wsave').addEventListener('click',saveWeight);
+
+render();
+initDb();
+})();
+</script>
+
+</html>
