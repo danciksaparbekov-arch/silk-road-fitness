@@ -121,6 +121,44 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
 .small{font-size:13px}
 .empty{color:var(--muted);font-size:14px;margin:0}
 @media (prefers-reduced-motion:no-preference){.bar>i{transition:width .5s ease}}
+[hidden]{display:none!important}
+.between{justify-content:space-between;align-items:center}
+.hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.hd h2{margin:0}
+.ex{padding:10px 0;border-top:1px solid var(--line)}
+.ex:first-of-type{border-top:0;padding-top:0}
+.ex .meta{font-size:13px;color:var(--muted)}
+.setrow{display:flex;align-items:center;gap:8px;margin-top:6px}
+.setrow .sn{width:78px;font-size:13px;color:var(--muted);flex:none}
+.setrow input{width:84px}
+.setrow button{min-width:56px}
+.setrow.done .sn{color:var(--ok);font-weight:700}
+.setrow button.done{background:transparent;color:var(--ok);border-color:var(--ok);opacity:1}
+.rest{min-height:24px;font-family:var(--display);font-size:20px;color:var(--cur);font-variant-numeric:tabular-nums;margin:10px 0 0}
+.warnbox{border-color:var(--warn)}
+.warnbox h2{color:var(--warn)}
+.warnbox li{padding:4px 0;font-size:14px}
+.battle{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.side h3{margin-bottom:6px}
+.side ul li{display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:3px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.bar.foe>i{background:var(--warn)}
+.bar.you>i{background:var(--conq)}
+.rlog{margin-top:10px;display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--muted);min-height:20px}
+.bbanner{margin-top:10px;padding:10px 12px;border-radius:6px;border:1.5px solid var(--line);background:var(--bg);font-weight:700;font-size:14px}
+.bbanner:empty{display:none}
+.bbanner.win{border-color:var(--conq);color:var(--conq)}
+.bbanner.lose{border-color:var(--warn);color:var(--warn)}
+.shop li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.shop li .s{grid-column:1;color:var(--muted);font-size:13px}
+.shop li button{grid-row:1/3;grid-column:2;min-height:34px;padding:2px 12px;font-size:13px}
+.dows{display:flex;flex-wrap:wrap;gap:6px}
+.dows label{display:flex;align-items:center;gap:4px;font-size:14px;border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:var(--bg);cursor:pointer}
+.dows input{min-height:0;width:auto;margin:0}
+.flag{color:var(--cur);cursor:help}
+.log li.enemy{color:var(--warn)}
+.log li.enemy .d{color:var(--warn)}
+.log li{grid-template-columns:48px 1fr auto}
+.gold{color:var(--cur)}
 </style>
 
 <div class="wrap">
@@ -134,6 +172,11 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
 
   <section class="stats" id="stats" aria-label="Сводка"></section>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <section class="card warnbox" id="summary" hidden aria-label="Пока тебя не было"></section>
+
+  <section class="card" id="todaycard">
+    <div id="today"></div>
+  </section>
 
   <section class="card">
     <h2>Карта похода</h2>
@@ -141,15 +184,21 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
     <div class="info" id="info"></div>
   </section>
 
+  <section class="card">
+    <h2>Битва</h2>
+    <div id="battle"></div>
+    <ol class="clean rlog" id="rlog" aria-live="polite"></ol>
+    <div class="bbanner" id="bresult" role="status"></div>
+  </section>
+
   <div class="grid2">
     <div class="col">
       <section class="card">
         <h2>Поход</h2>
-        <p class="note" style="margin-bottom:10px">Добавляй подходы, затем заверши поход. Очки = повторения × сила упражнения.</p>
+        <p class="note" style="margin-bottom:10px">Свободные подходы сверх программы. Подходы из карточки «Сегодня» попадают сюда же. Завершение превращает повторы в войска.</p>
         <div class="row">
-          <label class="f" for="lad">Упражнение<select id="lad"></select></label>
-          <label class="f" for="tier">Уровень<select id="tier"></select></label>
-          <label class="f" for="reps">Повторы<input id="reps" type="number" min="1" max="300" inputmode="numeric" placeholder="10"></label>
+          <label class="f" for="exsel">Упражнение<select id="exsel"></select></label>
+          <label class="f" for="reps" id="replbl">Повторы<input id="reps" type="number" min="1" max="300" inputmode="numeric" placeholder="10"></label>
           <button id="addset" class="ghost" type="button">Добавить подход</button>
         </div>
         <ul class="clean draft" id="draft" style="margin-top:12px"></ul>
@@ -166,17 +215,19 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
     <div class="col">
       <section class="card">
         <h2>Лагерь</h2>
-        <p class="note">Калории и белок в норме за день = 1 провиант. Поход тратит 1. Без провианта армия голодна и очки режутся вдвое.</p>
+        <p class="note">Калории и белок в норме за день = 1 провиант. Тренировка тратит 1. Без провианта армия голодна и очки режутся вдвое.</p>
         <div class="pips" id="pips" style="margin:10px 0"></div>
         <div class="row">
           <button id="foodToday" type="button">Питание сегодня в норме</button>
           <button id="foodYest" class="ghost" type="button">За вчера</button>
         </div>
+        <h3 style="margin-top:16px">Лавка · <span class="gold" id="goldv">0</span> золота</h3>
+        <ul class="clean shop" id="shop"></ul>
       </section>
 
       <section class="card">
         <h2>Флот · вес</h2>
-        <p class="note">Каждый набранный килограмм от стартового веса даёт +100 очков.</p>
+        <p class="note">Каждый набранный килограмм от стартового веса даёт +2 всадника и +2 копейщика.</p>
         <div class="row" style="margin-top:10px">
           <label class="f" for="wt">Вес, кг<input id="wt" type="number" step="0.1" min="30" max="200" inputmode="decimal" placeholder="62.0"></label>
           <button id="wsave" type="button">Записать</button>
@@ -187,6 +238,29 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
       <section class="card">
         <h2>Карта недели</h2>
         <div id="weekcard"></div>
+      </section>
+
+      <section class="card" id="settingscard">
+        <h2>Настройки</h2>
+        <fieldset style="border:0;padding:0;margin:0 0 12px"><legend class="eyebrow" style="padding:0;margin-bottom:6px">Дни тренировок (2–5)</legend>
+          <div class="dows" id="dows"></div></fieldset>
+        <div class="row" style="margin-bottom:14px">
+          <label class="f" for="ttime">Время тренировки<input id="ttime" type="time" value="21:30"></label>
+        </div>
+        <h3>Перемирие</h3>
+        <p class="note">Болезнь или поездка: до 7 дней без набегов и дани, раз в календарный месяц.</p>
+        <div class="row" style="margin-top:8px">
+          <label class="f" for="truced">Дней<select id="truced"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option></select></label>
+          <button id="truce" class="ghost" type="button" data-act="truce">Объявить перемирие</button>
+        </div>
+        <p class="note" id="truceinfo" style="margin-top:8px"></p>
+        <h3 style="margin-top:16px">Резервная копия</h3>
+        <div class="row" style="margin-top:8px">
+          <button class="ghost" type="button" data-act="export">Экспорт</button>
+          <button class="ghost" type="button" data-act="import">Импорт</button>
+          <input id="impfile" type="file" accept="application/json,.json" hidden>
+        </div>
+        <div id="impbox" style="margin-top:8px"></div>
       </section>
     </div>
   </div>
@@ -203,85 +277,43 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
   </section>
 </div>
 
+<script src="game.js"></script>
 <script>
 (function(){
 'use strict';
-
-/* ---------- Данные кампании ---------- */
-var REGIONS=[
- {n:'Иссык-Куль',note:'Тёплое озеро в горах. Отсюда всё начинается.',str:200},
- {n:'Алматы',note:'Город под склонами Заилийского Алатау.',str:240},
- {n:'Ташкент',note:'Ворота Ферганы. Перевал держит страж.',str:280,boss:{what:'Отжимания подряд без остановки',unit:'повт.',target:20}},
- {n:'Самарканд',note:'Регистан и синие купола.',str:340},
- {n:'Бухара',note:'Старые караван-сараи и торговые купола.',str:400},
- {n:'Мерв',note:'Руины посреди Каракума. Перевал держит страж.',str:460,boss:{what:'Планка без перерыва',unit:'с',target:90}},
- {n:'Исфахан',note:'Площадь Накше-Джахан.',str:540},
- {n:'Тебриз',note:'Самый большой в мире крытый базар.',str:620},
- {n:'Стамбул',note:'Мост между Азией и Европой. Перевал держит страж.',str:700,boss:{what:'Отжимания подряд без остановки',unit:'повт.',target:30}},
- {n:'Рим',note:'Конец Великой дороги на суше.',str:800},
- {n:'Париж',note:'Почти у океана.',str:900},
- {n:'Лиссабон',note:'Край света. Последний страж.',str:1040,boss:{what:'Отжимания подряд без остановки',unit:'повт.',target:40}}
-];
-var LADDERS=[
- {id:'push',name:'Отжимания',tiers:[
-  {n:'Классические',k:1},
-  {n:'Узкие (бриллиант)',k:1.3,r:12},
-  {n:'Ноги на возвышении',k:1.5,r:10},
-  {n:'Пауза 2 с внизу',k:1.8,r:8},
-  {n:'Лучник',k:2.4,r:8}]},
- {id:'squat',name:'Ноги',tiers:[
-  {n:'Приседания',k:0.5},
-  {n:'Выпады на месте',k:0.7,r:15},
-  {n:'Болгарские сплит-приседания (на ногу)',k:1.1,r:12},
-  {n:'Пистолет с опорой (на ногу)',k:1.8,r:10}]},
- {id:'pull',name:'Тяга и спина',tiers:[
-  {n:'Тяга рюкзака в наклоне',k:1.2},
-  {n:'Подтягивания под столом',k:2,r:12},
-  {n:'Подтягивания с резинкой',k:2.5,r:10},
-  {n:'Подтягивания',k:3.5,r:8}]},
- {id:'core',name:'Корпус',tiers:[
-  {n:'Скручивания',k:0.5},
-  {n:'Подъём ног лёжа',k:0.8,r:15},
-  {n:'Планка (10 с = 1 повтор)',k:1,r:15},
-  {n:'Планка с касанием плеч (10 с = 1)',k:1.4,req:'планка 3×60 с'}]}
-];
-var CARDS=[
- {t:'Засада',x:'3 подхода отжиманий до отказа.',p:50},
- {t:'Союзник',x:'Проведи тренировку до 12:00.',p:40},
- {t:'Осадная башня',x:'Планка: 3 подхода на максимум.',p:45},
- {t:'Разведка',x:'15 минут растяжки или мобильности.',p:30},
- {t:'Караван',x:'30 г белка в течение часа после тренировки.',p:35},
- {t:'Кузница',x:'Сделай один подход в варианте следующего уровня.',p:60},
- {t:'Лагерь',x:'Сон 8 часов подряд.',p:30},
- {t:'Переход',x:'Прогулка 6000 шагов в день без тренировки.',p:30}
-];
-var PROV_MAX=7;
+var SR=window.SR;
+var REGIONS=SR.REGIONS,EX=SR.EX,LADDERS=SR.LADDERS,CARDS=SR.CARDS,UNITS=SR.UNITS;
+var DOW=['вс','пн','вт','ср','чт','пт','сб'];
+var FLAG_ICON={fast:'слишком быстро',bulk:'записано пачкой',high:'слишком много повторов'};
 
 /* ---------- Состояние ---------- */
-var KEY='silkroad.v1';
-function fresh(){return {v:1,updatedAt:0,region:0,progress:0,gatePassed:false,provisions:0,foodDays:[],trainDays:[],
-  unlocked:{push:0,squat:0,pull:0,core:0},startWeight:null,weight:null,weightKg:0,card:null,log:[],total:0};}
-function migrate(o){var f=fresh();if(!o||typeof o!=='object')return f;
-  for(var k in f){if(o[k]!==undefined)f[k]=o[k];}
-  f.unlocked=Object.assign({push:0,squat:0,pull:0,core:0},o.unlocked||{});return f;}
-function loadLocal(){try{var s=localStorage.getItem(KEY);if(s)return migrate(JSON.parse(s));}catch(e){}return fresh();}
+var KEY='silkroad.v2',OLDKEY='silkroad.v1',DKEY='silkroad.draft';
+function now(){return new Date();}
+function loadLocal(){
+  try{
+    var s=localStorage.getItem(KEY);if(s)return SR.migrate(JSON.parse(s),now());
+    var o=localStorage.getItem(OLDKEY);if(o)return SR.migrate(JSON.parse(o),now());
+  }catch(e){}
+  return SR.fresh(now());
+}
+function loadDraft(){
+  try{var o=JSON.parse(localStorage.getItem(DKEY)||'null');if(o&&o.d===SR.gameDay(now())&&Array.isArray(o.sets))return o.sets;}catch(e){}
+  return [];
+}
 var S=loadLocal();
-var draft=[];
-var viewIdx=null;
+var draft=loadDraft();
+var progReps={};            // введённые повторы по ключу «упражнение:подход»
+var summary=[];             // события врага для баннера «Пока тебя не было»
+var viewIdx=null,anim=false,pendingImport=null,lastBattle=null;
+var restEnd=0,restTimer=null;
 var dbRef=null,dbBusy=false,dbDirty=false,dbTimer=null;
 
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function pad(n){return (n<10?'0':'')+n;}
-function ymd(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
-function addDays(d,n){var x=new Date(d.getTime());x.setDate(x.getDate()+n);return x;}
-function today(){return ymd(new Date());}
-function weekKey(){var x=new Date();x.setDate(x.getDate()-((x.getDay()+6)%7));return ymd(x);}
-function num(n){return Math.round(n);}
-
-function setSync(mode){$('sync').textContent=mode==='cloud'?'Сохранено в облаке':'Сохранено на этом устройстве';}
+function fmtDate(d){var a=d.split('-');return a[2]+'.'+a[1];}
 function toast(t){$('toast').textContent=t;}
-function addLog(k,t,p){S.log.unshift({d:today(),k:k,t:t,p:p||0});if(S.log.length>100)S.log.length=100;}
+function setSync(mode){$('sync').textContent=mode==='cloud'?'Сохранено в облаке':'Сохранено на этом устройстве';}
+function saveDraft(){try{localStorage.setItem(DKEY,JSON.stringify({d:SR.gameDay(now()),sets:draft}));}catch(e){}}
 
 function save(){
   S.updatedAt=Date.now();
@@ -304,118 +336,148 @@ async function initDb(){
     dbRef=ref;
     var remote=snap.exists?snap.data():null;
     if(remote&&remote.state&&(remote.state.updatedAt||0)>(S.updatedAt||0)){
-      S=migrate(remote.state);
+      S=SR.migrate(remote.state,now());
       try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
-      render();setSync('cloud');
+      runEnemy();render();setSync('cloud');
     }else if(S.updatedAt>0){dbDirty=true;flushDb();}
     else setSync('cloud');
   }catch(e){dbRef=null;}
 }
 
-/* ---------- Игровая логика ---------- */
-function resolve(){
-  var out=[];
-  while(S.region<REGIONS.length){
-    var r=REGIONS[S.region];
-    if(S.progress<r.str)break;
-    if(r.boss&&!S.gatePassed)break;
-    S.progress-=r.str;S.gatePassed=false;
-    out.push(r.n);addLog('region','Завоёван регион: '+r.n,0);
-    S.region++;
-  }
-  if(S.region>=REGIONS.length)S.progress=0;
-  return out;
-}
-function applyPoints(p){S.total+=p;S.progress+=p;return resolve();}
-function announce(msg,conq){
-  if(conq.length)msg+=' Завоёван: '+conq.join(', ')+'.';
-  var gate=S.region<REGIONS.length&&REGIONS[S.region].boss&&!S.gatePassed&&S.progress>=REGIONS[S.region].str;
-  if(gate)msg+=' Гарнизон сломлен, впереди страж.';
-  if(S.region>=REGIONS.length)msg+=' Кампания пройдена!';
-  toast(msg);
-}
-function calcMods(){
-  var td=new Set(S.trainDays),t=today(),y=ymd(addDays(new Date(),-1)),y2=ymd(addDays(new Date(),-2)),y3=ymd(addDays(new Date(),-3));
-  var m=1,tags=[],spend=false;
-  if(S.provisions>0){spend=true;tags.push({t:'Провиант −1',c:'good'});}
-  else{m*=0.5;tags.push({t:'Голод ×0.5',c:'bad'});}
-  if(td.has(t)){m*=0.8;tags.push({t:'Второй поход за день ×0.8',c:'bad'});}
-  else if(td.has(y)&&td.has(y2)){m*=0.8;tags.push({t:'Третий день подряд ×0.8',c:'bad'});}
-  else if(!td.has(y)&&(td.has(y2)||td.has(y3))){m*=1.1;tags.push({t:'Отдохнувшая армия ×1.1',c:'good'});}
-  return {m:m,tags:tags,spend:spend};
-}
-function rawDraft(){return draft.reduce(function(a,s){return a+s.k*s.reps;},0);}
-function weekSessions(){
-  var wk=weekKey(),n=0;
-  S.trainDays.forEach(function(d){if(d>=wk)n++;});return n;
+/* ---------- Ход врага ---------- */
+function runEnemy(){
+  var ev=SR.processDays(S,now());
+  if(ev.length){summary=summary.concat(ev);save();}
+  return ev.length>0;
 }
 
-function addSet(){
-  var lad=LADDERS.filter(function(l){return l.id===$('lad').value;})[0];
-  var ti=parseInt($('tier').value,10);var reps=parseInt($('reps').value,10);
-  if(!lad||!(reps>0)){toast('Укажи число повторов.');return;}
-  var tr=lad.tiers[ti];
-  draft.push({lad:lad.id,name:tr.n,k:tr.k,reps:Math.min(reps,300)});
-  $('reps').value='';$('reps').focus();toast('');
-  renderSession();
+/* ---------- Действия ---------- */
+function addFreeSet(){
+  var id=$('exsel').value,reps=parseInt($('reps').value,10);
+  if(!EX[id]||!(reps>0)){toast('Укажи число повторов.');return;}
+  SR.addSet(draft,id,Math.min(reps,300),Date.now());saveDraft();
+  $('reps').value='';toast('');renderSession();renderToday();$('reps').focus();
 }
-function finishSession(){
-  var raw=rawDraft();if(!draft.length||raw<=0)return;
-  var md=calcMods();
-  var pts=num(raw*md.m);
-  if(md.spend)S.provisions--;
-  var t=today();if(S.trainDays.indexOf(t)<0){S.trainDays.push(t);if(S.trainDays.length>60)S.trainDays.shift();}
-  var sets=draft.length;draft=[];
-  addLog('session','Поход: '+sets+' подх., множитель ×'+md.m.toFixed(2),pts);
-  var conq=applyPoints(pts);
-  save();announce('Поход завершён: +'+pts+' очков.',conq);render();
+function tick(i,j){
+  var p=SR.programFor(S,now());if(p.type!=='train')return;
+  var it=p.items[i];if(!it)return;
+  var key=i+':'+j,inp=document.querySelector('input[data-rk="'+key+'"]');
+  var reps=parseInt(inp?inp.value:it.hi,10);
+  if(!(reps>0)){toast('Укажи число повторов.');return;}
+  if(draft.some(function(s){return s.pk===key;}))return;
+  SR.addSet(draft,it.ex,Math.min(reps,300),Date.now(),key);saveDraft();
+  restEnd=Date.now()+it.rest*1000;startTimer();toast('');
+  renderToday();renderSession();
 }
-function markFood(offset){
-  var d=ymd(addDays(new Date(),offset));
-  if(S.foodDays.indexOf(d)>=0){toast('Этот день уже засчитан.');return;}
-  if(S.provisions>=PROV_MAX){toast('Мешок полон: '+PROV_MAX+' из '+PROV_MAX+'. Сначала сходи в поход.');return;}
-  S.foodDays.push(d);if(S.foodDays.length>60)S.foodDays.shift();
-  S.provisions++;addLog('food','Провиант: '+(offset?'вчера':'сегодня'),0);
-  save();toast('Провиант +1.');render();
+function removeSet(i){draft.splice(i,1);SR.flagSets(draft);saveDraft();renderSession();renderToday();}
+function finish(){
+  if(!draft.length)return;
+  var res=SR.finishSession(S,draft,now(),{program:draft.some(function(s){return !!s.pk;})});
+  if(!res){toast('Нет засчитываемых подходов.');return;}
+  draft=[];progReps={};saveDraft();restEnd=0;save();
+  toast('Тренировка завершена: '+res.text+'.');render();
 }
+function markFood(off){var r=SR.markFood(S,now(),off);if(r.ok)save();toast(r.text);render();}
 function saveWeight(){
   var v=parseFloat(String($('wt').value).replace(',','.'));
-  if(!(v>=30&&v<=200)){toast('Введи вес в кг, например 62.5.');return;}
-  S.weight=v;if(S.startWeight==null)S.startWeight=v;
-  var kg=Math.floor(v-S.startWeight+1e-9),gain=0;
-  while(S.weightKg<kg){S.weightKg++;gain+=100;}
-  addLog('weight','Вес: '+v.toFixed(1)+' кг'+(gain?' (+'+gain/100+' кг от старта)':''),gain);
-  var conq=gain?applyPoints(gain):[];
-  save();$('wt').value='';
-  announce(gain?'Флот прибыл: +'+gain+' очков.':'Вес записан.',conq);render();
+  var r=SR.saveWeight(S,v,now());if(r.ok){save();$('wt').value='';}
+  toast(r.text);render();
 }
-function drawCard(){
-  var c=CARDS[Math.floor(Math.random()*CARDS.length)];
-  S.card={wk:weekKey(),id:CARDS.indexOf(c),done:false};
-  save();render();
-}
-function claimCard(){
-  if(!S.card||S.card.done)return;
-  var c=CARDS[S.card.id];S.card.done=true;
-  addLog('card','Карта: '+c.t,c.p);
-  var conq=applyPoints(c.p);save();announce('Задание выполнено: +'+c.p+' очков.',conq);render();
-}
+function drawCard(){SR.drawCard(S,now());save();render();}
+function claimCard(){var r=SR.claimCard(S,now());if(r.ok){save();toast(r.text);}render();}
 function challengeBoss(){
-  var r=REGIONS[S.region];if(!r||!r.boss)return;
   var v=parseFloat($('bossVal').value);
-  if(!(v>=0)){toast('Введи результат попытки.');return;}
-  if(v>=r.boss.target){
-    S.gatePassed=true;addLog('boss','Страж побеждён: '+r.n+' ('+v+' '+r.boss.unit+')',0);
-    var conq=resolve();save();announce('Страж побеждён!',conq);render();
-  }else{
-    toast('Не хватило: '+v+' из '+r.boss.target+' '+r.boss.unit+'. Потренируйся и попробуй снова.');
+  var r=SR.passBoss(S,v,now());
+  if(r.ok&&r.passed)save();
+  toast(r.text);render();
+}
+function unlockTier(id){var r=SR.unlockTier(S,id,now());if(r.ok){save();toast(r.text);}render();}
+function buy(item,type){var r=SR.buy(S,item,type,now());if(r.ok)save();toast(r.text);render();}
+function restDone(){var r=SR.markRest(S,now());if(r.ok)save();toast(r.text);render();}
+function moveDay(){var r=SR.moveToTomorrow(S,now());if(r.ok)save();toast(r.text);render();}
+function truce(){
+  var r=SR.startTruce(S,now(),parseInt($('truced').value,10));
+  if(r.ok)save();toast(r.text);render();
+}
+function saveSettings(){
+  var dows=[].slice.call(document.querySelectorAll('#dows input:checked')).map(function(c){return parseInt(c.value,10);});
+  var r=SR.setSettings(S,dows,$('ttime').value||S.settings.time);
+  if(r.ok)save();toast(r.text);render();
+}
+function exportData(){
+  var blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='silk-road-'+SR.gameDay(now())+'.json';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+  toast('Файл сохранён.');
+}
+function importFile(f){
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var o=JSON.parse(rd.result);
+      if(!o||typeof o!=='object'||typeof o.v!=='number'||o.v<1||o.v>2)throw new Error('v');
+      pendingImport=SR.migrate(o,now());
+      $('impbox').innerHTML='<div class="row" style="align-items:center"><span class="small">Текущий прогресс будет заменён. Продолжить?</span><button class="warn" type="button" data-act="imp2">Да, заменить</button><button class="ghost" type="button" data-act="imp0">Отмена</button></div>';
+    }catch(e){pendingImport=null;toast('Не удалось прочитать файл: нужен экспорт из этой игры.');}
+  };
+  rd.readAsText(f);
+}
+
+/* ---------- Таймер отдыха ---------- */
+function fmtSec(n){return Math.floor(n/60)+':'+(n%60<10?'0':'')+(n%60);}
+function updateRest(){
+  var el=$('rest');if(!el)return;
+  if(!restEnd){el.textContent='';return;}
+  var left=Math.ceil((restEnd-Date.now())/1000);
+  if(left>0)el.textContent='Отдых: '+fmtSec(left);
+  else{
+    el.textContent='Отдых закончен. Следующий подход.';
+    if(restTimer){clearInterval(restTimer);restTimer=null;if(navigator.vibrate)try{navigator.vibrate(200);}catch(e){}}
   }
 }
-function unlockTier(id){
-  var l=LADDERS.filter(function(x){return x.id===id;})[0];
-  if(!l||S.unlocked[id]>=l.tiers.length-1)return;
-  S.unlocked[id]++;addLog('forge','Открыто: '+l.tiers[S.unlocked[id]].n,0);
-  save();toast('Новый уровень: '+l.tiers[S.unlocked[id]].n+'.');render();
+function startTimer(){if(restTimer)clearInterval(restTimer);restTimer=setInterval(updateRest,1000);}
+
+/* ---------- Карточка «Сегодня» ---------- */
+function nextTrain(){
+  var t=SR.gameDay(now());
+  for(var i=1;i<=7;i++){var d=SR.addDays(t,i);if(SR.isTrainDay(S,d))return DOW[SR.dow(d)]+' '+fmtDate(d);}
+  return '';
+}
+function renderToday(){
+  var p=SR.programFor(S,now()),h='';
+  if(p.type==='rest'){
+    h='<div class="hd"><h2>Сегодня</h2><span class="pill">День отдыха</span></div>'+
+      '<p class="note" style="margin-bottom:10px"><b>День отдыха: 10 минут мобильности.</b> Плечи, бёдра, спина. Отметка спасает от набега.</p>'+
+      '<div class="row"><button type="button" data-act="rest"'+(p.done?' disabled':'')+'>'+(p.done?'Засчитано':'Сделал')+'</button>'+
+      '<button class="ghost" type="button" data-act="gotruce">Перемирие</button></div>'+
+      '<p class="note" style="margin-top:8px">Следующая тренировка: '+esc(nextTrain())+' ('+S.plan.nextWorkout+').</p>';
+  }else{
+    h='<div class="hd"><h2>Сегодня</h2><span>'+
+      '<span class="pill cur">Тренировка '+p.workout+' · '+(p.short?'короткая':'полная')+'</span>'+(p.deload?' <span class="pill">разгрузка</span>':'')+'</span></div>';
+    if(p.done&&!draft.length){
+      h+='<p class="note"><b style="color:var(--ok)">Норма дня выполнена ✓</b> Лишние подходы можно добавить в карточке «Поход».</p>';
+    }else{
+      p.items.forEach(function(it,i){
+        var e=EX[it.ex],unit=e.unit==='10s'?' (×10 с)':'';
+        h+='<div class="ex"><h3>'+esc(it.name)+'</h3><div class="meta">'+it.sets+' × '+(it.max?'макс':(it.lo===it.hi?it.hi:it.lo+'–'+it.hi))+unit+' · отдых '+(it.rest>=120?'2 мин':it.rest+' с')+'</div>';
+        for(var j=0;j<it.sets;j++){
+          var key=i+':'+j,ds=draft.filter(function(s){return s.pk===key;})[0];
+          var val=ds?ds.reps:(progReps[key]!=null?progReps[key]:it.hi);
+          h+='<div class="setrow'+(ds?' done':'')+'"><span class="sn">Подход '+(j+1)+'</span>'+
+            '<input type="number" min="1" max="300" inputmode="numeric" data-rk="'+key+'" value="'+val+'" aria-label="Повторы, подход '+(j+1)+'"'+(ds?' disabled':'')+'>'+
+            '<button type="button" class="'+(ds?'done':'')+'" data-act="tick" data-i="'+i+'" data-j="'+j+'" aria-label="Записать подход '+(j+1)+'"'+(ds?' disabled':'')+'>✓</button>'+
+            (ds&&ds.flag?'<span class="flag" title="'+esc(FLAG_ICON[ds.flag])+'">⚠</span>':'')+'</div>';
+        }
+        h+='</div>';
+      });
+      h+='<div class="rest" id="rest" role="timer"></div>';
+    }
+    h+='<div class="row" style="margin-top:12px"><button type="button" data-act="finish"'+(draft.length?'':' disabled')+'>Завершить тренировку</button>'+
+      '<button class="ghost" type="button" data-act="move"'+(p.move.ok?'':' disabled')+(p.move.ok?'':' title="'+esc(p.move.text)+'"')+'>Перенести на завтра</button>'+
+      '<button class="ghost" type="button" data-act="gotruce">Перемирие</button></div>';
+    if(!p.move.ok&&!p.done)h+='<p class="small muted" style="margin-top:6px">Перенос недоступен: '+esc(p.move.text)+'</p>';
+  }
+  $('today').innerHTML=h;updateRest();
 }
 
 /* ---------- Карта ---------- */
@@ -452,102 +514,196 @@ function renderMap(){
   renderInfo(sel);
 }
 function renderInfo(i){
-  var r=REGIONS[i],c=S.region,st=i<c?'conq':(i===c?'cur':'lock');
+  var r=REGIONS[i],c=S.region,st=i<c?'conq':(i===c?'cur':'lock'),n=SR.GARRISON_N[i];
   var h='<div class="top"><div class="name">'+(i+1)+'. '+esc(r.n)+'</div><span class="pill '+st+'">'+(st==='conq'?'Завоёван':(st==='cur'?'Текущая цель':'Впереди'))+'</span></div>';
   h+='<p class="note">'+esc(r.note)+'</p>';
-  if(st==='conq'){h+='<div class="bar done"><i style="width:100%"></i></div><div class="barlbl"><span>Гарнизон разбит</span><span>'+r.str+'</span></div>';}
+  if(st==='conq'){h+='<div class="bar done"><i style="width:100%"></i></div><div class="barlbl"><span>Гарнизон разбит</span><span>дань +3 золота в день</span></div>';}
   else if(st==='cur'){
-    var pr=Math.min(S.progress,r.str),pct=Math.round(pr/r.str*100),gate=r.boss&&!S.gatePassed&&S.progress>=r.str;
-    h+='<div class="bar"><i style="width:'+pct+'%"></i></div><div class="barlbl"><span>Гарнизон</span><span>'+pr+' / '+r.str+'</span></div>';
-    if(S.progress>r.str)h+='<div class="small muted">Запас очков после гарнизона: +'+(S.progress-r.str)+'. Он перейдёт в следующий регион.</div>';
-    if(gate){
-      h+='<div class="boss"><div><b>Страж перевала.</b> '+esc(r.boss.what)+', цель: '+r.boss.target+' '+r.boss.unit+'.</div>'+
-        '<div class="row"><label class="f" for="bossVal">Результат ('+r.boss.unit+')<input id="bossVal" type="number" min="0" inputmode="numeric"></label>'+
+    var g=S.garrison,tot=g?SR.count(g):0,cap=g?(g.base+g.reinf):1,pct=Math.round(tot/cap*100);
+    h+='<div class="bar foe"><i style="width:'+pct+'%"></i></div><div class="barlbl"><span>Гарнизон</span><span>'+(S.upgrades.scouts?tot+' / '+cap:SR.garrisonView(S).approx)+'</span></div>';
+    if(SR.bossReady(S)){
+      var b=r.boss;
+      h+='<div class="boss"><div><b>Страж перевала.</b> '+esc(b.what)+', цель: '+b.target+' '+b.unit+'.</div>'+
+        '<div class="row"><label class="f" for="bossVal">Результат ('+b.unit+')<input id="bossVal" type="number" min="0" inputmode="numeric"></label>'+
         '<button class="amber" type="button" data-act="boss">Бросить вызов</button></div></div>';
     }else if(r.boss){h+='<div class="small muted">Когда гарнизон падёт, выйдет страж: '+esc(r.boss.what).toLowerCase()+', цель '+r.boss.target+' '+r.boss.unit+'.</div>';}
   }else{
-    h+='<div class="barlbl"><span>Гарнизон</span><span>'+r.str+'</span></div>';
+    h+='<div class="barlbl"><span>Гарнизон</span><span>около '+n+'</span></div>';
     if(r.boss)h+='<div class="small muted">Перевал: '+esc(r.boss.what).toLowerCase()+', цель '+r.boss.target+' '+r.boss.unit+'.</div>';
   }
   if(c>=REGIONS.length)h='<div class="boss" style="border-color:var(--conq);background:var(--bg)"><div><b style="color:var(--conq)">Кампания пройдена.</b> Все 12 регионов завоёваны. Сбрось карту внизу страницы, чтобы начать новый поход.</div></div>'+h;
   $('info').innerHTML=h;
 }
 
+/* ---------- Битва ---------- */
+function sideHtml(title,counts,hpFrac,cls,exact,approxText){
+  var rows=UNITS.map(function(u){return '<li><span>'+SR.UNIT_NAMES[u]+'</span><b>'+(exact?counts[u]:'?')+'</b></li>';}).join('');
+  var total=SR.count(counts);
+  return '<div class="side"><h3>'+title+'</h3><ul class="clean">'+rows+'</ul>'+
+    '<div class="bar '+cls+'" style="margin-top:8px" role="img" aria-label="Здоровье: '+Math.round(hpFrac*100)+'%"><i style="width:'+Math.round(hpFrac*100)+'%"></i></div>'+
+    '<div class="barlbl"><span>'+(exact?'Всего '+total:esc(approxText))+'</span><span>'+Math.round(hpFrac*100)+'%</span></div></div>';
+}
+function foeApprox(foe){return SR.garrisonView({garrison:foe,upgrades:S.upgrades}).approx;}
+function drawSides(you,foe,youFrac,foeFrac){
+  var exact=!!S.upgrades.scouts;
+  $('battle').innerHTML='<div class="battle">'+sideHtml('Твоя армия',you,youFrac,'you',true,'')+
+    sideHtml('Гарнизон',foe,foeFrac,'foe',exact,foeApprox(foe))+'</div>';
+}
+function renderBattle(){
+  if(anim)return;
+  var el=$('battle');
+  if(S.region>=REGIONS.length||!S.garrison){el.innerHTML='<p class="empty">Кампания пройдена. Битв больше нет.</p>';$('bresult').textContent='';return;}
+  var g=S.garrison,cap=g.base+g.reinf,gate=SR.bossReady(S);
+  drawSides(S.army,g,1,Math.min(1,SR.count(g)/cap));
+  el.insertAdjacentHTML('beforeend','<div class="row" style="margin-top:12px;align-items:center"><button class="amber" type="button" data-act="attack"'+
+    (SR.count(S.army)===0||gate?' disabled':'')+'>Атаковать</button><span class="small muted">'+
+    (gate?'Гарнизон разбит. Страж ждёт на карте.':(SR.count(S.army)===0?'Армии нет: тренируйся.':'В бой идёт вся армия: до 6 раундов.'))+'</span></div>');
+  var b=lastBattle;$('bresult').className='bbanner'+(b?(b.win?' win':' lose'):'');$('bresult').textContent=b?b.text:'';
+}
+function battleBanner(res){
+  var lostTxt='Потери: '+res.totalLost+(SR.count(res.healed)?' (лекарь вернул '+SR.count(res.healed)+')':'')+'.';
+  if(res.conquered)return {win:true,text:'Победа! Завоёван регион: '+res.conquered+'. Добыча +'+res.loot+' золота. '+lostTxt};
+  if(res.bossAppears)return {win:true,text:'Гарнизон разбит! Появился страж перевала. '+lostTxt};
+  if(res.outcome==='defeat')return {win:false,text:'Разгром: армия уничтожена. Гарнизон ослаблен. '+lostTxt};
+  return {win:false,text:'Отступление после 6 раундов. Гарнизон ослаблен: потери врага остаются. '+lostTxt};
+}
+function attack(){
+  if(anim)return;
+  var res=SR.attack(S,Math.random,now());
+  if(!res.ok){toast(res.text);return;}
+  save();anim=true;lastBattle=null;
+  $('rlog').innerHTML='';$('bresult').className='bbanner';$('bresult').textContent='';
+  var y0=SR.hpOf(res.you0)||1,f0=SR.hpOf(res.foe0)||1;
+  drawSides(res.you0,res.foe0,1,1);
+  var reduced=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches,i=0;
+  function step(){
+    if(i>=res.rounds.length){
+      lastBattle=battleBanner(res);anim=false;toast('');render();return;
+    }
+    var r=res.rounds[i++];
+    drawSides(r.you,r.foe,Math.min(1,SR.hpOf(r.you)/y0),Math.min(1,SR.hpOf(r.foe)/f0));
+    $('rlog').insertAdjacentHTML('beforeend','<li>Раунд '+r.round+'. '+esc(r.text)+'</li>');
+    if(reduced)step();else setTimeout(step,400);
+  }
+  step();
+}
+
 /* ---------- Остальные блоки ---------- */
+function renderSummary(){
+  var el=$('summary');
+  if(!summary.length){el.hidden=true;el.innerHTML='';return;}
+  el.hidden=false;
+  el.innerHTML='<h2>Пока тебя не было</h2><ul class="clean">'+summary.map(function(e){return '<li>'+fmtDate(e.day)+': '+esc(e.text)+'</li>';}).join('')+'</ul>'+
+    '<div style="margin-top:10px"><button class="ghost" type="button" data-act="sumok">Понятно</button></div>';
+}
 function renderStats(){
-  var c=Math.min(S.region+1,REGIONS.length);
+  var c=Math.min(S.region+1,REGIONS.length),th=SR.threat(S);
   $('stats').innerHTML=
    '<div class="stat"><div class="l">Регион</div><div class="v">'+c+' / '+REGIONS.length+'</div></div>'+
-   '<div class="stat"><div class="l">Очки</div><div class="v">'+S.total+'</div></div>'+
-   '<div class="stat"><div class="l">Провиант</div><div class="v">'+S.provisions+' / '+PROV_MAX+'</div></div>'+
-   '<div class="stat"><div class="l">Походов за неделю</div><div class="v">'+weekSessions()+' / 3</div></div>';
+   '<div class="stat"><div class="l">Армия</div><div class="v">'+SR.count(S.army)+'</div></div>'+
+   '<div class="stat"><div class="l">Золото</div><div class="v gold">'+S.gold+'</div></div>'+
+   '<div class="stat"><div class="l">Провиант</div><div class="v">'+S.provisions+' / '+SR.PROV_MAX+'</div></div>'+
+   '<div class="stat"><div class="l">Тренировок за неделю</div><div class="v">'+SR.weekSessions(S,now())+' / '+S.settings.trainDow.length+'</div></div>'+
+   '<div class="stat"><div class="l">Угроза</div><div class="v" style="font-size:20px;'+(th.level?'color:var(--warn)':'')+'">'+th.level+' · '+th.text+'</div></div>';
 }
+function exLabel(id){var e=EX[id];return e.n+' (×'+e.k+')';}
 function renderSession(){
-  var ls=$('lad'),prevL=ls.value||LADDERS[0].id;
-  ls.innerHTML=LADDERS.map(function(l){return '<option value="'+l.id+'">'+esc(l.name)+'</option>';}).join('');
-  ls.value=prevL;
-  var lad=LADDERS.filter(function(l){return l.id===ls.value;})[0],ts=$('tier'),prevT=ts.value;
-  ts.innerHTML=lad.tiers.slice(0,S.unlocked[lad.id]+1).map(function(t,i){return '<option value="'+i+'">'+esc(t.n)+' (×'+t.k+')</option>';}).join('');
-  if(prevT&&+prevT<=S.unlocked[lad.id])ts.value=prevT;else ts.value=String(S.unlocked[lad.id]);
+  var sel=$('exsel'),prev=sel.value,av=SR.availableEx(S);
+  sel.innerHTML=LADDERS.map(function(l){
+    var o=av.filter(function(id){return EX[id].lad===l.id;});
+    return '<optgroup label="'+esc(l.name)+'">'+o.map(function(id){return '<option value="'+id+'">'+esc(exLabel(id))+'</option>';}).join('')+'</optgroup>';
+  }).join('');
+  if(av.indexOf(prev)>=0)sel.value=prev;
+  var u=EX[sel.value]&&EX[sel.value].unit==='10s';
+  $('replbl').firstChild.textContent=u?'Повторы (10 с = 1)':'Повторы';
   $('draft').innerHTML=draft.length?draft.map(function(s,i){
-    return '<li><span>'+esc(s.name)+': '+s.reps+' × '+s.k+' = <b>'+num(s.reps*s.k)+'</b></span><button class="ghost" type="button" data-act="rmset" data-i="'+i+'" aria-label="Убрать подход">×</button></li>';
+    var e=EX[s.ex];
+    return '<li><span>'+esc(e.n)+': '+s.reps+' × '+e.k+' = <b>'+Math.round(s.reps*e.k*(s.flag?0.5:1))+'</b>'+
+      (s.flag?' <span class="flag" title="'+esc(FLAG_ICON[s.flag])+' (×0.5)">⚠</span>':'')+'</span>'+
+      '<button class="ghost" type="button" data-act="rmset" data-i="'+i+'" aria-label="Убрать подход">×</button></li>';
   }).join(''):'<li class="muted">Подходов пока нет.</li>';
-  var raw=rawDraft(),md=calcMods();
-  var tags=md.tags.map(function(t){return '<span class="tag '+t.c+'">'+esc(t.t)+'</span>';}).join('');
-  $('preview').innerHTML='<div class="tags">'+tags+'</div>'+
-    '<div class="row" style="justify-content:space-between;align-items:center"><div class="total">≈ '+num(raw*md.m)+' <span class="small muted">очков</span></div>'+
-    '<button type="button" data-act="finish"'+(draft.length?'':' disabled')+'>Завершить поход</button></div>';
+  var c=SR.calcSession(S,draft,now());
+  var tags=c.tags.map(function(t){return '<span class="tag '+t.c+'">'+esc(t.t)+'</span>';}).join('');
+  var ut=SR.unitsText(c.units);
+  var verdict=!draft.length?'':(c.ok?'<span class="tag good">проверено ✓</span>':'<span class="tag bad" title="Помеченные подходы считаются вдвое слабее">есть сомнения ⚠</span>');
+  $('preview').innerHTML='<div class="tags">'+tags+verdict+'</div>'+
+    '<div class="row" style="justify-content:space-between;align-items:center"><div><div class="total">≈ '+c.total+' <span class="small muted">очков</span></div>'+
+    '<div class="small muted">'+(draft.length?(ut||'Новых воинов пока нет, очки копятся'):'')+'</div></div>'+
+    '<button type="button" data-act="finish"'+(draft.length?'':' disabled')+'>Завершить тренировку</button></div>';
 }
 function renderForge(){
   $('forge').innerHTML=LADDERS.map(function(l){
     var u=S.unlocked[l.id];
     return '<div class="lad"><h3>'+esc(l.name)+'</h3><ol class="clean tiers">'+l.tiers.map(function(t,i){
-      var cls=i<=u?'done':(i===u+1?'next':'lock');
-      var s='<li class="'+cls+'"><span class="dot"></span><span>'+esc(t.n)+'</span><span class="k">×'+t.k+'</span>';
+      var e=EX[t.ex],cls=i<=u?'done':(i===u+1?'next':'lock');
+      var s='<li class="'+cls+'"><span class="dot"></span><span>'+esc(e.n)+'</span><span class="k">×'+e.k+'</span>';
       if(cls==='next'){
-        var req=t.req||('3×'+t.r+' в «'+l.tiers[i-1].n+'»');
+        var req=t.req||('3×'+t.r+' в «'+EX[l.tiers[i-1].ex].n+'»');
         s+='<span class="small muted">Тест: '+esc(req)+'</span><button class="ghost" type="button" data-act="unlock" data-lad="'+l.id+'">Тест сдан</button>';
       }
       return s+'</li>';
     }).join('')+'</ol></div>';
   }).join('');
 }
+function shopRow(name,desc,item,type){
+  var i=SR.shopInfo(S,item,type),done=i.lvl>=i.max;
+  return '<li><span><b>'+esc(name)+'</b>'+(i.max>1?' · ур. '+i.lvl+'/'+i.max:'')+'</span><span class="s">'+esc(desc)+'</span>'+
+    '<button type="button" class="ghost" data-act="buy" data-item="'+item+'"'+(type?' data-type="'+type+'"':'')+(i.can?'':' disabled')+'>'+(done?'Куплено':'Купить · '+i.cost)+'</button></li>';
+}
 function renderCamp(){
-  var p='';for(var i=0;i<PROV_MAX;i++)p+='<span class="pip'+(i<S.provisions?' on':'')+'"></span>';
-  $('pips').innerHTML=p;$('pips').setAttribute('aria-label','Провиант: '+S.provisions+' из '+PROV_MAX);
-  var t=today(),y=ymd(addDays(new Date(),-1));
-  $('foodToday').disabled=S.foodDays.indexOf(t)>=0||S.provisions>=PROV_MAX;
+  var p='';for(var i=0;i<SR.PROV_MAX;i++)p+='<span class="pip'+(i<S.provisions?' on':'')+'"></span>';
+  $('pips').innerHTML=p;$('pips').setAttribute('aria-label','Провиант: '+S.provisions+' из '+SR.PROV_MAX);
+  var t=SR.gameDay(now()),y=SR.addDays(t,-1);
+  $('foodToday').disabled=S.foodDays.indexOf(t)>=0||S.provisions>=SR.PROV_MAX;
   $('foodToday').textContent=S.foodDays.indexOf(t)>=0?'Сегодня засчитано':'Питание сегодня в норме';
-  $('foodYest').disabled=S.foodDays.indexOf(y)>=0||S.provisions>=PROV_MAX;
+  $('foodYest').disabled=S.foodDays.indexOf(y)>=0||S.provisions>=SR.PROV_MAX;
   var w=S.weight==null?'Старт не задан. Введи текущий вес, он станет точкой отсчёта.':
     'Старт '+S.startWeight.toFixed(1)+' кг, сейчас '+S.weight.toFixed(1)+' кг ('+((S.weight-S.startWeight)>=0?'+':'')+(S.weight-S.startWeight).toFixed(1)+'). Килограммов в зачёте: '+S.weightKg+'.';
   $('wnote').textContent=w;
+  $('goldv').textContent=S.gold;
+  var cut=['0','25','45','60'];
+  var sh=shopRow('Стены','Набеги слабее на '+cut[Math.min(3,S.upgrades.walls+1)]+'% (сейчас −'+cut[S.upgrades.walls]+'%)','walls');
+  sh+=shopRow('Лекарь','35% потерь в бою возвращается','healer');
+  sh+=shopRow('Разведчики','Точный состав гарнизона','scouts');
+  SR.UNITS.forEach(function(u){sh+=shopRow('Кузнец: '+SR.UNIT_NAMES[u].toLowerCase(),'Атака +15% за уровень','smith',u);});
+  $('shop').innerHTML=sh;
 }
 function renderWeekCard(){
-  var el=$('weekcard');
-  if(!S.card||S.card.wk!==weekKey()){
-    el.innerHTML='<p class="note" style="margin-bottom:10px">Раз в неделю можно вытянуть карту события с бонусным заданием.</p><button class="amber" type="button" data-act="draw">Вытянуть карту</button>';return;
+  var el=$('weekcard'),wk=SR.weekKey(SR.gameDay(now()));
+  if(!S.card||S.card.wk!==wk){
+    el.innerHTML='<p class="note" style="margin-bottom:10px">Раз в неделю можно вытянуть карту события с бонусным заданием. Награда: золото.</p><button class="amber" type="button" data-act="draw">Вытянуть карту</button>';return;
   }
   var c=CARDS[S.card.id];
-  el.innerHTML='<div class="cardq"><h3>'+esc(c.t)+'</h3><div>'+esc(c.x)+'</div><div class="small muted">Награда: +'+c.p+' очков</div>'+
+  el.innerHTML='<div class="cardq"><h3>'+esc(c.t)+'</h3><div>'+esc(c.x)+'</div><div class="small muted">Награда: +'+c.p+' золота</div>'+
    (S.card.done?'<div class="small" style="color:var(--ok);font-weight:700">Выполнено на этой неделе</div>':'<div><button type="button" data-act="claim">Задание выполнено</button></div>')+'</div>';
+}
+function renderSettings(){
+  var order=[1,2,3,4,5,6,0];
+  $('dows').innerHTML=order.map(function(d){
+    return '<label><input type="checkbox" value="'+d+'"'+(S.settings.trainDow.indexOf(d)>=0?' checked':'')+'>'+DOW[d]+'</label>';
+  }).join('');
+  $('ttime').value=S.settings.time;
+  var t=SR.gameDay(now()),on=S.enemy.truceUntil&&S.enemy.truceUntil>=t;
+  $('truce').disabled=!!on;
+  $('truceinfo').textContent=on?'Перемирие действует до '+fmtDate(S.enemy.truceUntil)+'.':(S.enemy.truceUsedMonth[t.slice(0,7)]?'В этом месяце перемирие уже использовано.':'Перемирие в этом месяце доступно.');
 }
 function renderRoute(){
   $('route').innerHTML=REGIONS.map(function(r,i){
-    var st=i<S.region?'conq':(i===S.region?'cur':'lock');
-    var lbl=st==='conq'?'готово':(st==='cur'?Math.min(S.progress,r.str)+' / '+r.str:String(r.str));
+    var st=i<S.region?'conq':(i===S.region?'cur':'lock'),n=SR.GARRISON_N[i];
+    var lbl=st==='conq'?'готово':(st==='cur'&&S.garrison?(S.upgrades.scouts?SR.count(S.garrison)+' / '+(S.garrison.base+S.garrison.reinf):SR.garrisonView(S).approx):'≈'+n);
     return '<li class="'+st+'"><span class="n">'+(i+1)+'</span><span><b>'+esc(r.n)+'</b>'+(r.boss?' <span class="pill">перевал</span>':'')+'</span><span class="s">'+lbl+'</span></li>';
   }).join('');
 }
-function fmtDate(d){var a=d.split('-');return a[2]+'.'+a[1];}
 function renderLog(){
-  var l=S.log.slice(0,8);
+  var l=S.log.slice(0,10);
   $('log').innerHTML=l.length?l.map(function(e){
-    return '<li><span class="d">'+fmtDate(e.d)+'</span><span>'+esc(e.t)+'</span><span class="p">'+(e.p?'+'+e.p:'')+'</span></li>';
-  }).join(''):'<li class="muted">Журнал пуст. Первый поход откроет Иссык-Куль.</li>';
+    return '<li class="'+(e.k==='enemy'?'enemy':'')+'"><span class="d">'+fmtDate(e.d)+'</span><span>'+esc(e.t)+'</span><span class="p">'+(e.p?'+'+e.p:'')+'</span></li>';
+  }).join(''):'<li class="muted">Журнал пуст. Первая тренировка соберёт армию.</li>';
   $('resetbox').innerHTML='<button class="warn" type="button" data-act="reset1">Сбросить кампанию</button>';
 }
-function render(){renderStats();renderMap();renderSession();renderForge();renderCamp();renderWeekCard();renderRoute();renderLog();}
+function render(){
+  renderStats();renderSummary();renderToday();renderMap();renderBattle();renderSession();renderForge();renderCamp();renderWeekCard();renderSettings();renderRoute();renderLog();
+}
 
 /* ---------- События ---------- */
 document.addEventListener('click',function(e){
@@ -555,27 +711,49 @@ document.addEventListener('click',function(e){
   if(node){viewIdx=parseInt(node.getAttribute('data-i'),10);renderMap();return;}
   var b=e.target.closest('[data-act]');if(!b)return;
   var a=b.getAttribute('data-act');
-  if(a==='finish')finishSession();
-  else if(a==='rmset'){draft.splice(parseInt(b.getAttribute('data-i'),10),1);renderSession();}
+  if(a==='finish')finish();
+  else if(a==='tick')tick(parseInt(b.getAttribute('data-i'),10),parseInt(b.getAttribute('data-j'),10));
+  else if(a==='rmset')removeSet(parseInt(b.getAttribute('data-i'),10));
   else if(a==='unlock')unlockTier(b.getAttribute('data-lad'));
   else if(a==='boss')challengeBoss();
   else if(a==='draw')drawCard();
   else if(a==='claim')claimCard();
+  else if(a==='attack')attack();
+  else if(a==='buy')buy(b.getAttribute('data-item'),b.getAttribute('data-type'));
+  else if(a==='rest')restDone();
+  else if(a==='move')moveDay();
+  else if(a==='truce')truce();
+  else if(a==='gotruce'){var sc=$('settingscard');sc.scrollIntoView({behavior:'smooth',block:'start'});$('truced').focus();}
+  else if(a==='sumok'){summary=[];renderSummary();}
+  else if(a==='export')exportData();
+  else if(a==='import'){$('impfile').value='';$('impfile').click();}
+  else if(a==='imp0'){pendingImport=null;$('impbox').innerHTML='';}
+  else if(a==='imp2'&&pendingImport){S=pendingImport;pendingImport=null;draft=[];saveDraft();viewIdx=null;lastBattle=null;save();$('impbox').innerHTML='';toast('Прогресс загружен из файла.');runEnemy();render();}
   else if(a==='reset1'){$('resetbox').innerHTML='<div class="row" style="align-items:center"><span class="small">Весь прогресс будет удалён. Продолжить?</span><button class="warn" type="button" data-act="reset2">Да, сбросить</button><button class="ghost" type="button" data-act="reset0">Отмена</button></div>';}
   else if(a==='reset0')renderLog();
-  else if(a==='reset2'){S=fresh();draft=[];viewIdx=null;save();toast('Карта сброшена. Новый поход начинается.');render();}
+  else if(a==='reset2'){S=SR.fresh(now());draft=[];saveDraft();summary=[];lastBattle=null;viewIdx=null;save();toast('Карта сброшена. Новый поход начинается.');render();}
+});
+document.addEventListener('input',function(e){
+  var k=e.target.getAttribute&&e.target.getAttribute('data-rk');
+  if(k)progReps[k]=e.target.value;
+});
+document.addEventListener('change',function(e){
+  if(e.target.closest&&(e.target.closest('#dows')||e.target.id==='ttime'))saveSettings();
+  else if(e.target.id==='impfile'&&e.target.files&&e.target.files[0])importFile(e.target.files[0]);
 });
 document.addEventListener('keydown',function(e){
   if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('g.node')){e.preventDefault();viewIdx=parseInt(e.target.getAttribute('data-i'),10);renderMap();var n=document.querySelector('g.node[data-i="'+viewIdx+'"]');if(n)n.focus();}
-  if(e.key==='Enter'&&e.target.id==='reps')addSet();
+  if(e.key==='Enter'&&e.target.id==='reps')addFreeSet();
   if(e.key==='Enter'&&e.target.id==='wt')saveWeight();
 });
-$('addset').addEventListener('click',addSet);
-$('lad').addEventListener('change',renderSession);
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&runEnemy())render();});
+$('addset').addEventListener('click',addFreeSet);
+$('exsel').addEventListener('change',renderSession);
 $('foodToday').addEventListener('click',function(){markFood(0);});
 $('foodYest').addEventListener('click',function(){markFood(-1);});
 $('wsave').addEventListener('click',saveWeight);
 
+runEnemy();
 render();
 initDb();
 })();
