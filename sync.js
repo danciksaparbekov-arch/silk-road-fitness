@@ -4,7 +4,7 @@
 'use strict';
 // Заполнить после деплоя бота (см. bot/README.md)
 var WORKER_URL='https://silk-road-bot.danislam2003.workers.dev';   // например https://silk-road-bot.<аккаунт>.workers.dev
-var BOT_USERNAME=''; // имя бота без @, например silk_road_fit_bot
+var BOT_USERNAME='silk_road_dan_bot'; // имя бота без @, например silk_road_fit_bot
 
 var timer=null;
 
