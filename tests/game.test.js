@@ -73,7 +73,7 @@ test('контры: копейщик ×1.5 против конницы, конн
   var r=SR.simulateBattle({spear:10,cav:0,arch:0,shield:0},{spear:0,cav:10,arch:0,shield:0},null,half);
   var melee=r.rounds[1]; // раунд 1: залп, затем рукопашная
   assert.equal(melee.foe.cav,7);   // 10*3*1.5=45 урона → 3 убито (hp12)
-  assert.equal(melee.you.spear,6); // 10*4=40 урона по копейщикам без бонуса → 4 убито
+  assert.equal(melee.you.spear,7); // 10*4*0.95 (FOE_DMG)=38 урона по копейщикам (hp10) → 3 убито
   var r2=SR.simulateBattle({spear:0,cav:10,arch:0,shield:0},{spear:0,cav:0,arch:10,shield:0},null,half);
   assert.equal(r2.rounds[0].you.cav,8);  // залп 30 урона → 2 убито
   assert.equal(r2.rounds[1].foe.arch,2); // 8*4*1.5=48 → 8 лучников

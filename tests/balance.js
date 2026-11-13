@@ -1,10 +1,11 @@
 /* Монте-Карло симуляция темпа кампании (SPEC §9). Запуск: node tests/balance.js
    Игрок: программа 3 раза в неделю (вт/чт/сб), повторы = середина диапазона +5% каждые 2 недели (шум ±10%),
-   питание 5 дней из 7, атака когда армия >= 1.2 x гарнизона, дни отдыха отмечаются мобильностью.
+   питание 5 дней из 7, атака когда армия >= 1.4 x гарнизона, дни отдыха отмечаются мобильностью.
    Допущения: Кузница открывает по одному уровню в каждой лестнице раз в 3 недели; страж-тест сдаётся на
    следующий день после падения гарнизона; золото в симуляции не тратится (магазин не учитывается). */
 'use strict';
 var SR=require('../game.js');
+var THR=+process.env.THR||1.4;
 var RUNS=+process.env.RUNS||200,MAXW=60;
 
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
@@ -36,7 +37,7 @@ function simulate(variant,seed){
     if(SR.bossReady(s)){
       if(bossWait){var r=SR.passBoss(s,999,now);bossWait=false;if(r.passed)closeRegion(s.region-1);}
       else bossWait=true;
-    }else if(s.garrison&&SR.count(s.army)>=1.2*SR.count(s.garrison)){
+    }else if(s.garrison&&SR.count(s.army)>=THR*SR.count(s.garrison)){
       var before=SR.count(s.army),reg=s.region,res=SR.attack(s,rng,now);
       if(res.ok){cur.lossSum+=before?res.totalLost/before:0;cur.battles++;if(res.conquered)closeRegion(reg,res);}
     }

@@ -24,6 +24,7 @@ var UNIT_GEN={spear:'копейщиков',cav:'всадников',arch:'луч
 var UNIT_DOM={spear:'копейщики',cav:'конница',arch:'лучники',shield:'щитоносцы'};
 var STATS={spear:{atk:3,hp:10},cav:{atk:4,hp:12},arch:{atk:3,hp:6},shield:{atk:1,hp:20}};
 var SMITH_STEP=0.15;
+var FOE_DMG=0.95; // множитель урона врага в бою (баланс, SPEC §9)
 var PROV_MAX=7;
 var NO_RETRO_DAYS=14;
 
@@ -403,7 +404,7 @@ function simulateBattle(you,foe,smith,rng){
     // залп: оба урона считаем от состояния до залпа
     var pa0=pick(A),pb0=pick(B);
     var ra=1+(rng()*2-1)*0.15,rb=1+(rng()*2-1)*0.15;
-    var dA=A.arch*STATS.arch.atk*sm('arch')*ra,dB=B.arch*STATS.arch.atk*rb;
+    var dA=A.arch*STATS.arch.atk*sm('arch')*ra,dB=B.arch*STATS.arch.atk*FOE_DMG*rb;
     applyDamage(B,accB,dA,null);applyDamage(A,accA,dB,null);
     rounds.push({round:r,phase:'volley',you:pick(A),foe:pick(B),
       text:'Залп: враг теряет '+lostText(pb0,B)+', ты теряешь '+lostText(pa0,A)});
@@ -411,7 +412,7 @@ function simulateBattle(you,foe,smith,rng){
     // ближний бой: одновременно, от состояния до боя
     pa0=pick(A);pb0=pick(B);
     var mA={spear:A.spear*STATS.spear.atk*sm('spear'),cav:A.cav*STATS.cav.atk*sm('cav'),shield:A.shield*STATS.shield.atk*sm('shield')};
-    var mB={spear:B.spear*STATS.spear.atk,cav:B.cav*STATS.cav.atk,shield:B.shield*STATS.shield.atk};
+    var mB={spear:B.spear*STATS.spear.atk*FOE_DMG,cav:B.cav*STATS.cav.atk*FOE_DMG,shield:B.shield*STATS.shield.atk*FOE_DMG};
     applyDamage(B,accB,mA.spear,'cav');applyDamage(B,accB,mA.cav,'arch');applyDamage(B,accB,mA.shield,null);
     applyDamage(A,accA,mB.spear,'cav');applyDamage(A,accA,mB.cav,'arch');applyDamage(A,accA,mB.shield,null);
     rounds.push({round:r,phase:'melee',you:pick(A),foe:pick(B),

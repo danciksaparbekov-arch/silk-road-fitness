@@ -132,8 +132,32 @@ Session duration (first→last set) recorded for later watch-matching (chunk 3).
 
 ## 9. Balance sim (`tests/balance.js`)
 Simulate a player doing the program 3×/week with typical reps (midpoint of ranges, +5%/2 weeks progression),
-food 5/7 days, attacking whenever army ≥ 1.2× garrison units. Variants: perfect, 1 miss/week, 1 lost week.
+food 5/7 days, attacking whenever army ≥ 1.4× garrison units (`THR`, env override). Variants: perfect, 1 miss/week, 1 lost week.
 Print per region: sessions to conquer, avg losses %, gold at conquest. Tune `N_r` to §5 targets. Commit final numbers.
+
+**Final balance (tuned 2026-11-14):** enemy damage in battle ×`FOE_DMG`=0.95 (game.js) and sim attack threshold raised 1.2→1.4.
+Before: losses 50–70% per battle. After: typical 24–47% (avg ≈34%), campaign median perfect 16.6 wk (target 16–22),
+lostweek 18.9 wk, miss1 31.9 wk (skipping every Saturday is a deliberately harsh case). Raid/reinforce/siege and «Месть» unchanged.
+Threshold alone barely changes pace; `FOE_DMG` is the main lever. Sim output (perfect, 200 runs, seeds 1000+):
+
+```
+== Вариант: perfect (прогонов 200) ==
+Регион | Гарнизон | Достигли | Тренировок | Потери армии % | Золото
+     1 |       18 |     100% |        2.0 |             24 |     20
+     2 |       34 |     100% |        1.6 |             39 |     61
+     3 |       52 |     100% |        2.5 |             24 |    144
+     4 |       72 |     100% |        2.0 |             34 |    222
+     5 |       94 |     100% |        3.1 |             41 |    369
+     6 |      118 |     100% |        4.0 |             42 |    597
+     7 |      144 |     100% |        5.4 |             37 |    882
+     8 |      172 |     100% |        4.5 |             33 |   1199
+     9 |      204 |     100% |        5.0 |             43 |   1599
+    10 |      238 |     100% |        6.6 |             47 |   2098
+    11 |      274 |     100% |        6.4 |             39 |   2662
+    12 |      312 |     100% |        6.9 |             33 |   3330
+Кампания пройдена: 200/200; недель: медиана 16.6, мин 15.9, макс 17.1; регионов в среднем 12.0
+
+```
 
 ## 10. Backup
 «Экспорт» → download `silk-road-YYYY-MM-DD.json`; «Импорт» → file input, validate `v`, migrate, confirm before overwrite.
