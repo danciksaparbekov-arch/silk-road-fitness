@@ -140,3 +140,47 @@ Print per region: sessions to conquer, avg losses %, gold at conquest. Tune `N_r
 
 ## Out of scope (chunk 2/3)
 Telegram bot + Cloudflare Worker reminders (chunk 2), watch/Strava verification (chunk 3). Do not add network calls.
+
+---
+# CHUNK 2 — Telegram reminders (Cloudflare Worker + cron)
+
+Language: Russian messages (enemy voice, short, 1–3 lines). Comments Russian, identifiers English. No deps (plain Worker JS).
+Timezone fixed Asia/Bishkek (UTC+6, no DST); keep as constant TZ_OFFSET_H=6.
+
+## Files
+- `bot/logic.js` — PURE: `decide(user, nowUtcMs)` → `[{kind, text}]` messages to send now (empty if none); `gameDayOf(ms)`; templates. UMD like game.js.
+- `bot/worker.js` — fetch + scheduled handlers using logic.js. `bot/wrangler.toml` (name silk-road-bot, cron `*/10 * * * *`, KV binding `STATE`, id placeholder `REPLACE_WITH_KV_ID`).
+- `bot/test/logic.test.js` — `node --test` (run as `node --test` inside bot/ or `node --test bot/test/logic.test.js`).
+- `bot/README.md` — Russian deploy steps for a beginner (BotFather → wrangler login → kv create → secrets → deploy → setWebhook), exact commands for PowerShell.
+- App side: new `sync.js` (loaded by index.html, added to sw.js FILES, cache → silk-road-v3) + «Напоминания» block in Settings.
+
+## Linking (no accounts)
+App generates `linkCode` (16 chars [a-z0-9], crypto.getRandomValues) stored in state.settings.linkCode. Settings shows «Подключить Telegram» link
+`https://t.me/<BOT_USERNAME>?start=<code>` (constants BOT_USERNAME, WORKER_URL at top of sync.js; if WORKER_URL is empty → block shows
+«Напоминания пока не настроены» and nothing is sent). Bot on `/start <code>` stores `chatId` into KV key `u:<code>` (create if absent) and replies
+confirmation. `/stop` → delete chatId (no messages), `/status` → current norm status text. Webhook verified via header
+`X-Telegram-Bot-Api-Secret-Token` == env.WEBHOOK_SECRET (else 401).
+
+## Sync API
+`POST /sync` JSON `{code, s:{gameDay, trainDow:[..], time:'HH:MM', normMet:bool, isTrainDay:bool, truce:bool, region:int, regionName, garrisonPct:0-100, miss:int, workout:'A'|'B', short:bool, weekSessions:int, weekTarget:int}}`.
+Validate: code /^[a-z0-9]{16}$/, body ≤ 2 KB, numeric/bool types, strings ≤ 40 chars; store `u:<code>.s` + `updatedAt` (merge, keep chatId, keep `sent`). CORS: only ALLOWED_ORIGINS
+(`https://danciksaparbekov-arch.github.io,http://localhost:8000`, same pattern as ../english-grammar-site/worker/worker.js). Rate limit by KV counter or skip; response `{ok:true}`.
+App sends after each save (debounce 2 s) and on load; failures silent; only the minimal fields above, nothing else.
+No sync for a user without chatId is needed but harmless.
+
+## Schedule (decide)
+Local time = UTC+6. Quiet hours 23:30–07:30 (no sends). A message kind is sent at most once per game day (`sent[kind]=gameDay`). Only if `chatId`, `!truce`, `!normMet`,
+and the synced `gameDay` equals today's game day (stale sync → send nothing, except a once-per-3-days «давно не заходил» nudge if no sync for >48 h).
+- `morning` ≥ 08:00 (first cron tick after): train day → «Сегодня тренировка {A/B} ({короткая|полная}) в {time}. Гарнизон {regionName}: {pct}%.»; rest day → «День отдыха: 10 минут мобильности и еда в норме.»
+- `courses` ≥ 20:50 only on train days: «Курсы закончились? Враг у ворот {regionName}…»
+- `last` ≥ 22:30 (train days and rest days): last warning that missing → «ночной набег» (text by `miss`: 0 набег / 1 подкрепление / 2 осада — i.e. the consequence of the NEXT miss).
+- `weekly` Sunday ≥ 19:00 once per week: «Итоги недели: {weekSessions}/{weekTarget}…» — sent even if normMet.
+Snooze: inline button «⏰ +30 мин» (callback `snooze:<kind>`) → store `snoozeUntil`, bot re-sends the same kind after it; button «Открыть игру» (url button to the Pages URL). NO «Сделал» button — game state lives in the app only.
+Texts: 3 variants per kind chosen deterministically (hash of gameDay) to avoid repetition. Escape nothing exotic: use plain text (no parse_mode).
+
+## Security
+Token only in secret TELEGRAM_BOT_TOKEN (never in repo/app). Webhook secret check. Link code = capability (16 random chars); don't log codes. KV values small. Document in README.
+
+## Tests (logic.test.js)
+gameDayOf at 02:00/23:30 local; quiet hours; once-per-day dedupe; normMet suppresses everything except weekly; truce suppresses; stale sync; train vs rest texts;
+correct kind order across a simulated day of cron ticks every 10 min (assert exactly the expected sends); snooze; Sunday weekly once.

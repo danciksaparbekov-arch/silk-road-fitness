@@ -1,6 +1,6 @@
 // Кэш оболочки приложения: после первого открытия страница работает без сети
-const CACHE='silk-road-v2';
-const FILES=['./','./index.html','./game.js','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-180.png'];
+const CACHE='silk-road-v3';
+const FILES=['./','./index.html','./game.js','./sync.js','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-180.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(n=>n!==CACHE).map(n=>caches.delete(n)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',e=>{

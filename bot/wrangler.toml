@@ -1,0 +1,15 @@
+# Cloudflare Worker бота «Шёлковый путь». Секреты (TELEGRAM_BOT_TOKEN, WEBHOOK_SECRET) задаются через wrangler secret put, здесь их нет.
+name = "silk-road-bot"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "REPLACE_WITH_KV_ID"
+
+[vars]
+ALLOWED_ORIGINS = "https://danciksaparbekov-arch.github.io,http://localhost:8000"
+GAME_URL = "https://danciksaparbekov-arch.github.io/silk-road-fitness/"

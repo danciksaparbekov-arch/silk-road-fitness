@@ -254,6 +254,8 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
           <button id="truce" class="ghost" type="button" data-act="truce">Объявить перемирие</button>
         </div>
         <p class="note" id="truceinfo" style="margin-top:8px"></p>
+        <h3 style="margin-top:16px">Напоминания</h3>
+        <div id="remind"></div>
         <h3 style="margin-top:16px">Резервная копия</h3>
         <div class="row" style="margin-top:8px">
           <button class="ghost" type="button" data-act="export">Экспорт</button>
@@ -278,6 +280,7 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
 </div>
 
 <script src="game.js"></script>
+<script src="sync.js"></script>
 <script>
 (function(){
 'use strict';
@@ -318,6 +321,7 @@ function saveDraft(){try{localStorage.setItem(DKEY,JSON.stringify({d:SR.gameDay(
 function save(){
   S.updatedAt=Date.now();
   try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  if(window.SRSync)SRSync.schedule(S);
   if(dbRef){dbDirty=true;clearTimeout(dbTimer);dbTimer=setTimeout(flushDb,700);}
 }
 function flushDb(){
@@ -687,6 +691,22 @@ function renderSettings(){
   $('truce').disabled=!!on;
   $('truceinfo').textContent=on?'Перемирие действует до '+fmtDate(S.enemy.truceUntil)+'.':(S.enemy.truceUsedMonth[t.slice(0,7)]?'В этом месяце перемирие уже использовано.':'Перемирие в этом месяце доступно.');
 }
+function renderRemind(){
+  var el=$('remind');
+  if(!window.SRSync||!SRSync.configured()){el.innerHTML='<p class="note">Напоминания пока не настроены.</p>';return;}
+  if(!S.settings.linkCode){
+    el.innerHTML='<p class="note">Бот в Telegram напомнит о тренировке и предупредит перед набегом. Отправляются только расписание и статус нормы.</p>'+
+      '<div class="row" style="margin-top:8px"><button class="ghost" type="button" data-act="tglink">Подключить Telegram</button></div>';
+    return;
+  }
+  el.innerHTML='<p class="note">Нажми на ссылку, в Telegram выбери «Запустить». Отключить напоминания можно командой /stop в чате с ботом.</p>'+
+    '<div class="row" style="margin-top:8px"><button class="ghost" type="button" data-act="tglink">Подключить Telegram</button></div>';
+}
+function connectTg(){
+  if(!window.SRSync||!SRSync.configured())return;
+  SRSync.ensureCode(S);save();SRSync.send(S);renderRemind();
+  window.open(SRSync.linkUrl(S),'_blank','noopener');
+}
 function renderRoute(){
   $('route').innerHTML=REGIONS.map(function(r,i){
     var st=i<S.region?'conq':(i===S.region?'cur':'lock'),n=SR.GARRISON_N[i];
@@ -702,7 +722,7 @@ function renderLog(){
   $('resetbox').innerHTML='<button class="warn" type="button" data-act="reset1">Сбросить кампанию</button>';
 }
 function render(){
-  renderStats();renderSummary();renderToday();renderMap();renderBattle();renderSession();renderForge();renderCamp();renderWeekCard();renderSettings();renderRoute();renderLog();
+  renderStats();renderSummary();renderToday();renderMap();renderBattle();renderSession();renderForge();renderCamp();renderWeekCard();renderSettings();renderRemind();renderRoute();renderLog();
 }
 
 /* ---------- События ---------- */
@@ -723,15 +743,16 @@ document.addEventListener('click',function(e){
   else if(a==='rest')restDone();
   else if(a==='move')moveDay();
   else if(a==='truce')truce();
+  else if(a==='tglink')connectTg();
   else if(a==='gotruce'){var sc=$('settingscard');sc.scrollIntoView({behavior:'smooth',block:'start'});$('truced').focus();}
   else if(a==='sumok'){summary=[];renderSummary();}
   else if(a==='export')exportData();
   else if(a==='import'){$('impfile').value='';$('impfile').click();}
   else if(a==='imp0'){pendingImport=null;$('impbox').innerHTML='';}
-  else if(a==='imp2'&&pendingImport){S=pendingImport;pendingImport=null;draft=[];saveDraft();viewIdx=null;lastBattle=null;save();$('impbox').innerHTML='';toast('Прогресс загружен из файла.');runEnemy();render();}
+  else if(a==='imp2'&&pendingImport){var lc1=S.settings.linkCode;S=pendingImport;if(lc1)S.settings.linkCode=lc1;pendingImport=null;draft=[];saveDraft();viewIdx=null;lastBattle=null;save();$('impbox').innerHTML='';toast('Прогресс загружен из файла.');runEnemy();render();}
   else if(a==='reset1'){$('resetbox').innerHTML='<div class="row" style="align-items:center"><span class="small">Весь прогресс будет удалён. Продолжить?</span><button class="warn" type="button" data-act="reset2">Да, сбросить</button><button class="ghost" type="button" data-act="reset0">Отмена</button></div>';}
   else if(a==='reset0')renderLog();
-  else if(a==='reset2'){S=SR.fresh(now());draft=[];saveDraft();summary=[];lastBattle=null;viewIdx=null;save();toast('Карта сброшена. Новый поход начинается.');render();}
+  else if(a==='reset2'){var lc2=S.settings.linkCode;S=SR.fresh(now());if(lc2)S.settings.linkCode=lc2;draft=[];saveDraft();summary=[];lastBattle=null;viewIdx=null;save();toast('Карта сброшена. Новый поход начинается.');render();}
 });
 document.addEventListener('input',function(e){
   var k=e.target.getAttribute&&e.target.getAttribute('data-rk');
@@ -746,7 +767,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&e.target.id==='reps')addFreeSet();
   if(e.key==='Enter'&&e.target.id==='wt')saveWeight();
 });
-document.addEventListener('visibilitychange',function(){if(!document.hidden&&runEnemy())render();});
+document.addEventListener('visibilitychange',function(){if(!document.hidden){if(runEnemy())render();if(window.SRSync)SRSync.schedule(S);}});
 $('addset').addEventListener('click',addFreeSet);
 $('exsel').addEventListener('change',renderSession);
 $('foodToday').addEventListener('click',function(){markFood(0);});
@@ -756,6 +777,7 @@ $('wsave').addEventListener('click',saveWeight);
 runEnemy();
 render();
 initDb();
+if(window.SRSync)SRSync.schedule(S);
 })();
 </script>
 
