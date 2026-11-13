@@ -143,6 +143,67 @@ async function handleWebhook(request, env) {
   return new Response("ok");
 }
 
+/* ---------- Strava (chunk 3): включается только если заданы все три секрета, иначе маршруты отвечают 404 ---------- */
+const stravaOn = (env) => !!(env.STRAVA_VERIFY_TOKEN && env.STRAVA_CLIENT_ID && env.STRAVA_CLIENT_SECRET);
+
+// Обмен кода авторизации на токены (grant_type=authorization_code). fetchFn подменяется в тестах.
+async function stravaExchangeCode(env, code, fetchFn = fetch) {
+  const r = await fetchFn("https://www.strava.com/oauth/token", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: env.STRAVA_CLIENT_ID, client_secret: env.STRAVA_CLIENT_SECRET, code, grant_type: "authorization_code" })
+  });
+  return r.ok ? r.json() : null; // { access_token, refresh_token, expires_at, athlete }
+}
+// Обновление access-токена по refresh-токену
+async function stravaRefresh(env, refreshToken, fetchFn = fetch) {
+  const r = await fetchFn("https://www.strava.com/oauth/token", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: env.STRAVA_CLIENT_ID, client_secret: env.STRAVA_CLIENT_SECRET, grant_type: "refresh_token", refresh_token: refreshToken })
+  });
+  return r.ok ? r.json() : null;
+}
+async function stravaGetActivity(accessToken, id, fetchFn = fetch) {
+  const r = await fetchFn("https://www.strava.com/api/v3/activities/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + accessToken } });
+  return r.ok ? r.json() : null;
+}
+// Событие webhook: ищем привязку athlete → код (KV a:<owner_id>), берём активность, кладём в запись пользователя только 5 полей.
+// TODO: привязка athlete → код (OAuth-маршрут) и передача результата в игру пока не реализованы, см. bot/STRAVA.md.
+async function processStravaEvent(env, ev, fetchFn = fetch) {
+  const id = L.stravaActivityId(ev);
+  if (id == null || typeof ev.owner_id !== "number") return false;
+  const raw = await env.STATE.get("a:" + ev.owner_id);
+  if (!raw) return false; // чужой/непривязанный спортсмен: ничего не храним
+  const link = JSON.parse(raw);
+  if (!L.validCode(link.code) || typeof link.refresh !== "string") return false;
+  const tok = await stravaRefresh(env, link.refresh, fetchFn);
+  if (!tok || !tok.access_token) return false;
+  if (tok.refresh_token && tok.refresh_token !== link.refresh) {
+    await env.STATE.put("a:" + ev.owner_id, JSON.stringify({ code: link.code, refresh: tok.refresh_token }), { expirationTtl: L.TTL_LINKED_S });
+  }
+  const a = await stravaGetActivity(tok.access_token, id, fetchFn);
+  if (!a) return false;
+  const u = await getUser(env, link.code);
+  if (!u || !u.chatId) return false;
+  u.watch = { id, start_date: a.start_date, elapsed_time: a.elapsed_time, moving_time: a.moving_time, average_heartrate: a.average_heartrate };
+  await putUser(env, link.code, u);
+  return true;
+}
+async function handleStrava(request, env, ctx) {
+  if (request.method === "GET") { // подтверждение подписки: hub.mode, hub.verify_token, hub.challenge
+    const q = new URL(request.url).searchParams, ch = q.get("hub.challenge");
+    if (q.get("hub.mode") !== "subscribe" || q.get("hub.verify_token") !== env.STRAVA_VERIFY_TOKEN || !ch || ch.length > 200) {
+      return new Response("forbidden", { status: 403 });
+    }
+    return json({ "hub.challenge": ch }, 200, "");
+  }
+  if (request.method !== "POST") return new Response("method not allowed", { status: 405 });
+  const raw = await request.text();
+  if (raw.length > MAX_BODY) return new Response("too large", { status: 413 });
+  let ev; try { ev = JSON.parse(raw); } catch (e) { return new Response("ok"); }
+  ctx.waitUntil(processStravaEvent(env, ev).catch(() => {})); // Strava ждёт 200 за 2 с
+  return new Response("ok");
+}
+
 async function runCron(env) {
   const now = Date.now();
   let cursor;
@@ -172,8 +233,9 @@ async function runCron(env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === "/strava/webhook") return stravaOn(env) ? handleStrava(request, env, ctx) : new Response("not found", { status: 404 });
     if (url.pathname === "/webhook" && request.method === "POST") return handleWebhook(request, env);
 
     const origin = request.headers.get("Origin") || "";

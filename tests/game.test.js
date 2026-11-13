@@ -230,3 +230,35 @@ test('магазин, вес, настройки',function(){
   assert.equal(SR.setSettings(w,[1],'20:00').ok,false);
   assert.equal(SR.setSettings(w,[1,3,5],'20:00').ok,true);assert.deepEqual(w.settings.trainDow,[1,3,5]);
 });
+
+test('проверка часами: ×1.2 и без штрафа ⚠, только при включённой настройке', function(){
+  var d=[];SR.addSet(d,'push_classic',20,0);SR.addSet(d,'push_classic',20,1000); // «пачкой» → флаг, ×0.5
+  var s=SR.fresh(MON());s.provisions=3;
+  var base=SR.calcSession(s,JSON.parse(JSON.stringify(d)),MON());
+  assert.equal(base.verified,false);
+  // настройка выключена: verified игнорируется
+  var off=SR.calcSession(s,JSON.parse(JSON.stringify(d)),MON(),{verified:true});
+  assert.equal(off.verified,false);assert.equal(off.total,base.total);
+  SR.setWatchCheck(s,true);
+  var dd=JSON.parse(JSON.stringify(d));SR.flagSets(dd);
+  var on=SR.calcSession(s,dd,MON(),{verified:true});
+  assert.equal(on.verified,true);assert.equal(on.ok,true);
+  assert.ok(Math.abs(on.mult-base.mult*1.2)<1e-9);
+  assert.ok(on.rawTotal>base.rawTotal); // штраф ⚠ ×0.5 снят
+  // без флага-подходов множитель ровно ×1.2
+  var c1=SR.calcSession(s,[{ex:'push_classic',reps:10,ts:0}],MON());
+  var c2=SR.calcSession(s,[{ex:'push_classic',reps:10,ts:0}],MON(),{verified:true});
+  assert.ok(Math.abs(c2.mult/c1.mult-1.2)<1e-9);
+  assert.equal(c2.tags[c2.tags.length-1].t,'Часы ✓ ×1.2');
+});
+
+test('проверка часами: finishSession пишет session.verified, по умолчанию выкл', function(){
+  var s=SR.fresh(MON());
+  assert.equal(s.settings.watchCheck,false);
+  var d=[{ex:'push_classic',reps:10,ts:0}];
+  SR.finishSession(s,d,MON(),{verified:true}); // настройка выкл → не засчитывается
+  assert.equal(s.sessions[0].verified,false);
+  var s2=SR.fresh(MON());SR.setWatchCheck(s2,true);
+  SR.finishSession(s2,[{ex:'push_classic',reps:10,ts:0}],MON(),{verified:true});
+  assert.equal(s2.sessions[0].verified,true);
+});

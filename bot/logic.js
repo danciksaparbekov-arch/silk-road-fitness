@@ -158,7 +158,44 @@ function validCode(c){return typeof c==='string'&&c.length===16&&CODE_RE.test(c)
 
 function ttlFor(user){return user&&user.chatId?TTL_LINKED_S:TTL_UNLINKED_S;}
 
-var API={validCode:validCode,ttlFor:ttlFor,TTL_LINKED_S:TTL_LINKED_S,TTL_UNLINKED_S:TTL_UNLINKED_S,TZ_OFFSET_H:TZ_OFFSET_H,KINDS:KINDS,SNOOZE_MS:SNOOZE_MS,
+/* ---------- Проверка тренировки часами (Strava, chunk 3; инертно, пока не подключено) ---------- */
+var VERIFY_MIN_S=25*60, VERIFY_NEAR_MS=3*HOUR;
+// Окно сессии игры в мс UTC: session.start/end (мс) или, если их нет, игровой день session.d (03:00–03:00 по Бишкеку)
+function sessionWindow(session){
+  if(!session||typeof session!=='object')return null;
+  var a=session.start,b=session.end;
+  if(typeof a==='number'&&isFinite(a)&&typeof b==='number'&&isFinite(b)&&b>=a)return [a,b];
+  if(typeof session.d==='string'&&/^\d{4}-\d\d-\d\d$/.test(session.d)){
+    var p=session.d.split('-'),from=Date.UTC(+p[0],+p[1]-1,+p[2],DAY_SHIFT_H-TZ_OFFSET_H);
+    return [from,from+24*HOUR];
+  }
+  return null;
+}
+function num(v){return typeof v==='number'&&isFinite(v)?v:null;}
+// activity — объект активности Strava (start_date ISO UTC, elapsed_time/moving_time в сек, average_heartrate).
+// Подтверждено: ≥25 мин, есть пульс, активность пересекается с окном сессии или в пределах ±3 ч.
+function verifySession(activity,session){
+  if(!activity||typeof activity!=='object')return {verified:false,reason:'no_activity'};
+  var dur=num(activity.moving_time);if(dur==null)dur=num(activity.elapsed_time);
+  if(dur==null||dur<VERIFY_MIN_S)return {verified:false,reason:'too_short'};
+  var hr=num(activity.average_heartrate);
+  if(hr==null||hr<=30||hr>=250)return {verified:false,reason:'no_heartrate'};
+  var st=typeof activity.start_date==='string'?Date.parse(activity.start_date):NaN;
+  if(!isFinite(st))return {verified:false,reason:'bad_time'};
+  var win=sessionWindow(session);
+  if(!win)return {verified:false,reason:'no_session'};
+  var el=num(activity.elapsed_time);if(el==null||el<dur)el=dur;
+  var aEnd=st+el*1000;
+  if(st>win[1]+VERIFY_NEAR_MS||aEnd<win[0]-VERIFY_NEAR_MS)return {verified:false,reason:'other_time'};
+  return {verified:true,reason:'ok'};
+}
+// Событие webhook Strava → id новой активности или null (интересует только object_type=activity, aspect_type=create)
+function stravaActivityId(ev){
+  if(!ev||typeof ev!=='object'||ev.object_type!=='activity'||ev.aspect_type!=='create')return null;
+  var id=num(ev.object_id);return id!=null&&id>0&&id%1===0?id:null;
+}
+
+var API={verifySession:verifySession,stravaActivityId:stravaActivityId,validCode:validCode,ttlFor:ttlFor,TTL_LINKED_S:TTL_LINKED_S,TTL_UNLINKED_S:TTL_UNLINKED_S,TZ_OFFSET_H:TZ_OFFSET_H,KINDS:KINDS,SNOOZE_MS:SNOOZE_MS,
   gameDayOf:gameDayOf,localMinutes:localMinutes,isQuiet:isQuiet,decide:decide,rollForward:rollForward,applySent:applySent,snooze:snooze,statusText:statusText,textFor:textFor};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.SRBot=API;
 })(typeof globalThis!=='undefined'?globalThis:this);

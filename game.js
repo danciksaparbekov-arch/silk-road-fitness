@@ -24,6 +24,7 @@ var UNIT_GEN={spear:'копейщиков',cav:'всадников',arch:'луч
 var UNIT_DOM={spear:'копейщики',cav:'конница',arch:'лучники',shield:'щитоносцы'};
 var STATS={spear:{atk:3,hp:10},cav:{atk:4,hp:12},arch:{atk:3,hp:6},shield:{atk:1,hp:20}};
 var SMITH_STEP=0.15;
+var VERIFY_BONUS=1.2; // награда за тренировку, подтверждённую часами (chunk 3, выключено по умолчанию)
 var FOE_DMG=0.95; // множитель урона врага в бою (баланс, SPEC §9)
 var PROV_MAX=7;
 var NO_RETRO_DAYS=14;
@@ -118,7 +119,7 @@ function fresh(now){
     provisions:0,foodDays:[],trainDays:[],restDays:[],sessions:[],
     enemy:{miss:0,lastDay:addDays(t,-1),revenge:false,truceUntil:null,truceUsedMonth:{}},
     plan:{nextWorkout:'A',moved:null,weekStart:t},
-    settings:{trainDow:[2,4,6],time:'21:30'},
+    settings:{trainDow:[2,4,6],time:'21:30',watchCheck:false},
     unlocked:{push:0,squat:0,pull:0,core:0},
     startWeight:null,weight:null,weightKg:0,card:null,log:[]};
   s.garrison=spawnGarrison(0,1);
@@ -167,6 +168,7 @@ function weekSessions(s,now){
   s.trainDays.forEach(function(x){if(x>=wk&&x<=d)n++;});
   return n;
 }
+function setWatchCheck(s,on){s.settings.watchCheck=on===true;return s.settings.watchCheck;}
 function setSettings(s,trainDow,time){
   var seen={},ok=Array.isArray(trainDow)&&trainDow.every(function(x){
     if(!(x>=0&&x<=6)||x%1!==0||seen[x])return false;seen[x]=1;return true;});
@@ -266,7 +268,7 @@ function addSet(draft,exId,reps,ts,pk){
 }
 
 /* ---------- Набор войск ---------- */
-function calcMods(s,now){
+function calcMods(s,now,verified){
   var t=gameDay(now),y=addDays(t,-1),y2=addDays(t,-2),y3=addDays(t,-3);
   function has(d){return s.trainDays.indexOf(d)>=0;}
   var m=1,tags=[],spend=false;
@@ -276,6 +278,7 @@ function calcMods(s,now){
   else if(has(y)&&has(y2)){m*=0.8;tags.push({t:'Третий день подряд ×0.8',c:'bad'});}
   else if(!has(y)&&(has(y2)||has(y3))){m*=1.1;tags.push({t:'Отдохнувшая армия ×1.1',c:'good'});}
   if(s.enemy.revenge){m*=1.3;tags.push({t:'Месть ×1.3',c:'good'});}
+  if(verified){m*=VERIFY_BONUS;tags.push({t:'Часы ✓ ×1.2',c:'good'});}
   m=Math.max(0.4,Math.min(1.5,m));
   return {m:m,tags:tags,spend:spend};
 }
@@ -284,14 +287,16 @@ function unitsText(u){
   return a.length?a.join(', '):'';
 }
 // Чистый расчёт (без мутации): прогноз для превью и основа finishSession
-function calcSession(s,draft,now){
+// opts.verified: тренировка подтверждена часами → ×1.2 и без штрафа ×0.5 за ⚠-подходы; работает только при settings.watchCheck
+function calcSession(s,draft,now,opts){
+  var verified=!!(opts&&opts.verified&&s.settings.watchCheck===true);
   var raw={push:0,squat:0,pull:0,core:0},flagsSet={};
   draft.forEach(function(st){
     var e=EX[st.ex];if(!e)return;
-    raw[e.lad]+=st.reps*e.k*(st.flag?0.5:1);
+    raw[e.lad]+=st.reps*e.k*(st.flag&&!verified?0.5:1);
     if(st.flag)flagsSet[st.flag]=1;
   });
-  var md=calcMods(s,now),pts={},units={},frac={},sumPts=0,sumRaw=0;
+  var md=calcMods(s,now,verified),pts={},units={},frac={},sumPts=0,sumRaw=0;
   LADS.forEach(function(g){
     pts[g]=raw[g]*md.m;
     var f=s.frac[g]+pts[g],u=Math.floor(f/10+1e-9);
@@ -300,12 +305,12 @@ function calcSession(s,draft,now){
   });
   var flags=Object.keys(flagsSet);
   return {raw:raw,rawTotal:sumRaw,mult:md.m,tags:md.tags,spend:md.spend,pts:pts,total:Math.round(sumPts),
-    units:units,frac:frac,flags:flags,ok:flags.length===0};
+    units:units,frac:frac,flags:flags,ok:verified||flags.length===0,verified:verified};
 }
 function finishSession(s,draft,now,opts){
   if(!draft||!draft.length)return null;
   flagSets(draft);
-  var c=calcSession(s,draft,now),d=gameDay(now);
+  var c=calcSession(s,draft,now,opts),d=gameDay(now);
   if(c.rawTotal<=0)return null;
   UNITS.forEach(function(u){s.army[u]+=c.units[u];});
   s.frac=c.frac;s.total+=c.total;
@@ -314,7 +319,7 @@ function finishSession(s,draft,now,opts){
   if(!hasSession(s,d))capPush(s.trainDays,d,60);
   var ts=draft.map(function(x){return x.ts;}).filter(function(x){return typeof x==='number';});
   capPush(s.sessions,{d:d,start:ts.length?Math.min.apply(null,ts):null,end:ts.length?Math.max.apply(null,ts):null,
-    raw:Math.round(c.rawTotal),pts:c.total,mult:Math.round(c.mult*100)/100,flags:c.flags,
+    raw:Math.round(c.rawTotal),pts:c.total,mult:Math.round(c.mult*100)/100,flags:c.flags,verified:c.verified,
     sets:draft.map(function(x){var o={ex:x.ex,reps:x.reps,ts:x.ts};if(x.flag)o.flag=x.flag;return o;})},60);
   if(opts&&opts.program)s.plan.nextWorkout=s.plan.nextWorkout==='A'?'B':'A';
   var ut=unitsText(c.units);
@@ -546,7 +551,7 @@ Object.assign(SR,{
   fresh:fresh,migrate:migrate,spawnGarrison:spawnGarrison,count:count,hpOf:hpOf,
   isTrainDay:isTrainDay,hasSession:hasSession,planWeek:planWeek,weekSessions:weekSessions,setSettings:setSettings,
   programFor:programFor,canMove:canMove,moveToTomorrow:moveToTomorrow,markRest:markRest,availableEx:availableEx,
-  flagSets:flagSets,addSet:addSet,calcMods:calcMods,calcSession:calcSession,finishSession:finishSession,unitsText:unitsText,
+  flagSets:flagSets,addSet:addSet,setWatchCheck:setWatchCheck,VERIFY_BONUS:VERIFY_BONUS,calcMods:calcMods,calcSession:calcSession,finishSession:finishSession,unitsText:unitsText,
   saveWeight:saveWeight,markFood:markFood,unlockTier:unlockTier,drawCard:drawCard,claimCard:claimCard,
   shopInfo:shopInfo,buy:buy,simulateBattle:simulateBattle,attack:attack,bossReady:bossReady,passBoss:passBoss,conquer:conquer,
   garrisonView:garrisonView,threat:threat,processDays:processDays,startTruce:startTruce,addLog:addLog

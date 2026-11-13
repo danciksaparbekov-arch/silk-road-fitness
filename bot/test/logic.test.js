@@ -207,6 +207,50 @@ test('устаревшая синхронизация: в нетренирово
   assert.deepStrictEqual(got, ['08:00 morning', '22:30 last']);
 });
 
+// Сессия игры: вторник 21:30–22:05 по Бишкеку
+const SESS = { start: local(2026, 11, 10, 21, 30), end: local(2026, 11, 10, 22, 5), d: '2026-11-10' };
+const act = (over) => Object.assign({ id: 1, type: 'WeightTraining', start_date: new Date(local(2026, 11, 10, 21, 25)).toISOString(), elapsed_time: 2400, moving_time: 2300, average_heartrate: 120 }, over);
+
+test('verifySession: нормальная тренировка подтверждается', () => {
+  assert.deepStrictEqual(L.verifySession(act(), SESS), { verified: true, reason: 'ok' });
+});
+test('verifySession: границы длительности 25 мин', () => {
+  assert.strictEqual(L.verifySession(act({ moving_time: 1499 }), SESS).reason, 'too_short');
+  assert.strictEqual(L.verifySession(act({ moving_time: 1500 }), SESS).verified, true);
+  assert.strictEqual(L.verifySession(act({ moving_time: undefined, elapsed_time: 1200 }), SESS).reason, 'too_short');
+});
+test('verifySession: нет пульса или мусор в полях', () => {
+  assert.strictEqual(L.verifySession(act({ average_heartrate: undefined }), SESS).reason, 'no_heartrate');
+  assert.strictEqual(L.verifySession(act({ average_heartrate: 0 }), SESS).reason, 'no_heartrate');
+  assert.strictEqual(L.verifySession(act({ average_heartrate: '120' }), SESS).reason, 'no_heartrate');
+  assert.strictEqual(L.verifySession(act({ average_heartrate: NaN }), SESS).reason, 'no_heartrate');
+  assert.strictEqual(L.verifySession(act({ moving_time: 'abc', elapsed_time: null }), SESS).reason, 'too_short');
+  assert.strictEqual(L.verifySession(act({ start_date: 'не дата' }), SESS).reason, 'bad_time');
+  assert.strictEqual(L.verifySession(act({ start_date: 12345 }), SESS).reason, 'bad_time');
+  for (const bad of [null, undefined, 5, 'x']) assert.strictEqual(L.verifySession(bad, SESS).verified, false);
+  for (const bad of [null, undefined, {}, { d: 'вчера' }, { start: 'a', end: 'b' }]) assert.strictEqual(L.verifySession(act(), bad).reason, 'no_session');
+});
+test('verifySession: окно ±3 ч и чужой день', () => {
+  // за 2 ч до начала: подходит; за 5 ч до конца — нет
+  assert.strictEqual(L.verifySession(act({ start_date: new Date(local(2026, 11, 10, 19, 30)).toISOString(), elapsed_time: 1800, moving_time: 1800 }), SESS).verified, true);
+  assert.strictEqual(L.verifySession(act({ start_date: new Date(local(2026, 11, 10, 15, 0)).toISOString() }), SESS).reason, 'other_time');
+  assert.strictEqual(L.verifySession(act({ start_date: new Date(local(2026, 11, 9, 21, 30)).toISOString() }), SESS).reason, 'other_time');
+  assert.strictEqual(L.verifySession(act({ start_date: new Date(local(2026, 11, 11, 3, 0)).toISOString() }), SESS).reason, 'other_time');
+});
+test('verifySession: сессия без времён — окно по игровому дню', () => {
+  const s = { start: null, end: null, d: '2026-11-10' };
+  assert.strictEqual(L.verifySession(act(), s).verified, true);
+  assert.strictEqual(L.verifySession(act({ start_date: new Date(local(2026, 11, 8, 21, 30)).toISOString() }), s).reason, 'other_time');
+});
+test('stravaActivityId: только create активности с целым id', () => {
+  assert.strictEqual(L.stravaActivityId({ object_type: 'activity', aspect_type: 'create', object_id: 77, owner_id: 5 }), 77);
+  assert.strictEqual(L.stravaActivityId({ object_type: 'activity', aspect_type: 'update', object_id: 77 }), null);
+  assert.strictEqual(L.stravaActivityId({ object_type: 'athlete', aspect_type: 'create', object_id: 77 }), null);
+  assert.strictEqual(L.stravaActivityId({ object_type: 'activity', aspect_type: 'create', object_id: '77' }), null);
+  assert.strictEqual(L.stravaActivityId({ object_type: 'activity', aspect_type: 'create', object_id: 1.5 }), null);
+  assert.strictEqual(L.stravaActivityId(null), null);
+});
+
 test('TTL записи: без чата 7 дней, с чатом 120 дней', () => {
   assert.strictEqual(L.ttlFor({}), 7 * 86400);
   assert.strictEqual(L.ttlFor(null), 7 * 86400);

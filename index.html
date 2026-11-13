@@ -247,6 +247,9 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
         <div class="row" style="margin-bottom:14px">
           <label class="f" for="ttime">Время тренировки<input id="ttime" type="time" value="21:30"></label>
         </div>
+        <h3>Проверка часами</h3>
+        <p class="note">Эксперимент: тренировка, подтверждённая часами (через Strava), даёт ×1.2 и без штрафа ⚠. Пока бот не подключён, на игру не влияет.</p>
+        <label class="f" style="flex-direction:row;gap:8px;align-items:center;margin:6px 0 14px"><input id="watchchk" type="checkbox" data-act="watch"> Включить проверку часами</label>
         <h3>Перемирие</h3>
         <p class="note">Болезнь или поездка: до 7 дней без набегов и дани, раз в календарный месяц.</p>
         <div class="row" style="margin-top:8px">
@@ -687,6 +690,7 @@ function renderSettings(){
     return '<label><input type="checkbox" value="'+d+'"'+(S.settings.trainDow.indexOf(d)>=0?' checked':'')+'>'+DOW[d]+'</label>';
   }).join('');
   $('ttime').value=S.settings.time;
+  $('watchchk').checked=S.settings.watchCheck===true;
   var t=SR.gameDay(now()),on=S.enemy.truceUntil&&S.enemy.truceUntil>=t;
   $('truce').disabled=!!on;
   $('truceinfo').textContent=on?'Перемирие действует до '+fmtDate(S.enemy.truceUntil)+'.':(S.enemy.truceUsedMonth[t.slice(0,7)]?'В этом месяце перемирие уже использовано.':'Перемирие в этом месяце доступно.');
@@ -744,6 +748,7 @@ document.addEventListener('click',function(e){
   else if(a==='move')moveDay();
   else if(a==='truce')truce();
   else if(a==='tglink')connectTg();
+  else if(a==='watch'){SR.setWatchCheck(S,b.checked);save();toast(b.checked?'Проверка часами включена.':'Проверка часами выключена.');}
   else if(a==='gotruce'){var sc=$('settingscard');sc.scrollIntoView({behavior:'smooth',block:'start'});$('truced').focus();}
   else if(a==='sumok'){summary=[];renderSummary();}
   else if(a==='export')exportData();
