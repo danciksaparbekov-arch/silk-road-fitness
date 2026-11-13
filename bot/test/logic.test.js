@@ -206,3 +206,17 @@ test('устаревшая синхронизация: в нетренирово
   const got = simulate(u, local(2026, 11, 11, 7, 0), local(2026, 11, 11, 23, 0));
   assert.deepStrictEqual(got, ['08:00 morning', '22:30 last']);
 });
+
+test('TTL записи: без чата 7 дней, с чатом 120 дней', () => {
+  assert.strictEqual(L.ttlFor({}), 7 * 86400);
+  assert.strictEqual(L.ttlFor(null), 7 * 86400);
+  assert.strictEqual(L.ttlFor({ chatId: 5 }), 120 * 86400);
+  assert.ok(L.TTL_UNLINKED_S >= 60); // минимум KV expirationTtl
+});
+
+test('validCode: строго 16 символов [a-z0-9]', () => {
+  assert.ok(L.validCode('abcdefghij012345'));
+  for (const bad of ['', 'abc', 'ABCDEFGHIJ012345', 'abcdefghij01234!', 'abcdefghij0123456', 'abcdefghij012345\n', null, 5, {}, ['abcdefghij012345']]) {
+    assert.ok(!L.validCode(bad), String(bad));
+  }
+});

@@ -151,7 +151,14 @@ function snooze(user,kind,nowMs){
   return true;
 }
 
-var API={TZ_OFFSET_H:TZ_OFFSET_H,KINDS:KINDS,SNOOZE_MS:SNOOZE_MS,
+// Хранение записей в KV: пока нет привязанного чата, запись живёт мало (защита от засорения мусорными кодами)
+var CODE_RE=/^[a-z0-9]{16}$/;
+var TTL_LINKED_S=120*24*3600, TTL_UNLINKED_S=7*24*3600;
+function validCode(c){return typeof c==='string'&&c.length===16&&CODE_RE.test(c);} // длина отдельно: $ в JS пропускает завершающий перевод строки
+
+function ttlFor(user){return user&&user.chatId?TTL_LINKED_S:TTL_UNLINKED_S;}
+
+var API={validCode:validCode,ttlFor:ttlFor,TTL_LINKED_S:TTL_LINKED_S,TTL_UNLINKED_S:TTL_UNLINKED_S,TZ_OFFSET_H:TZ_OFFSET_H,KINDS:KINDS,SNOOZE_MS:SNOOZE_MS,
   gameDayOf:gameDayOf,localMinutes:localMinutes,isQuiet:isQuiet,decide:decide,rollForward:rollForward,applySent:applySent,snooze:snooze,statusText:statusText,textFor:textFor};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.SRBot=API;
 })(typeof globalThis!=='undefined'?globalThis:this);

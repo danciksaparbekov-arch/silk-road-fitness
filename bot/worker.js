@@ -4,8 +4,7 @@
 import L from './logic.js';
 
 const MAX_BODY = 2048;
-const CODE_RE = /^[a-z0-9]{16}$/;
-const TTL = 60 * 60 * 24 * 120; // запись живёт 120 дней с последнего обновления
+const TTL = L.TTL_LINKED_S; // чат привязан: запись живёт 120 дней с последнего обновления (для KV-ключа c:<chat>)
 
 function corsHeaders(origin) {
   return {
@@ -49,7 +48,8 @@ async function getUser(env, code) {
   return raw ? JSON.parse(raw) : null;
 }
 async function putUser(env, code, u) {
-  await env.STATE.put("u:" + code, JSON.stringify(u), { expirationTtl: TTL });
+  // Без привязанного чата TTL короткий (7 дней), при привязке (/start) продлевается до 120 дней
+  await env.STATE.put("u:" + code, JSON.stringify(u), { expirationTtl: L.ttlFor(u) });
 }
 
 async function tg(env, method, body) {
@@ -74,7 +74,7 @@ async function handleSync(request, env, origin) {
   if (raw.length > MAX_BODY) return json({ error: "too large" }, 413, origin);
   let body;
   try { body = JSON.parse(raw); } catch (e) { return json({ error: "bad json" }, 400, origin); }
-  if (!body || typeof body.code !== "string" || !CODE_RE.test(body.code)) return json({ error: "bad code" }, 400, origin);
+  if (!body || !L.validCode(body.code)) return json({ error: "bad code" }, 400, origin);
   const s = cleanState(body.s);
   if (!s) return json({ error: "bad state" }, 400, origin);
   const u = (await getUser(env, body.code)) || {};
@@ -112,7 +112,7 @@ async function handleWebhook(request, env) {
 
   if (cmd === "/start") {
     const code = (text.split(/\s+/)[1] || "").toLowerCase();
-    if (!CODE_RE.test(code)) {
+    if (!L.validCode(code)) {
       await say(env, chatId, "Открой игру, в Настройках нажми «Подключить Telegram» и вернись сюда по ссылке.");
       return new Response("ok");
     }
