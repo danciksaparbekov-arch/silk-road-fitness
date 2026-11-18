@@ -149,7 +149,7 @@ async function handleWebhook(request, env) {
     const idx = num >= 1 ? num - 1 : Math.floor(Math.random() * 100);
     const now = Date.now(), today = L.gameDayOf(now);
     const r = L.textForVariant(kind, L.rollForward(u.s, today), today, idx);
-    await tg(env, "sendMessage", { chat_id: chatId, text: r.text + "\n\n[тест: " + kind + ", вариант " + (r.idx + 1) + "/" + r.n + "]", reply_markup: keyboard(env, kind) });
+    await tg(env, "sendMessage", { chat_id: chatId, text: r.text, reply_markup: keyboard(env, kind) });
   } else if (cmd === "/status") {
     const code = await env.STATE.get("c:" + chatId);
     const u = code ? await getUser(env, code) : null;
