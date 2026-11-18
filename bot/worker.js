@@ -137,6 +137,19 @@ async function handleWebhook(request, env) {
       await env.STATE.delete("c:" + chatId);
     }
     await say(env, chatId, "Напоминания отключены. Чтобы вернуть их, подключи Telegram в игре заново.");
+  } else if (cmd === "/test") {
+    // /test [вид] [номер варианта с 1]: присылает пример уведомления с твоими данными, ничего не отмечает отправленным
+    const code = await env.STATE.get("c:" + chatId);
+    const u = code ? await getUser(env, code) : null;
+    if (!u || !u.s) { await say(env, chatId, "Чат не подключён к игре или нет данных. Открой игру и нажми «Подключить Telegram»."); return new Response("ok"); }
+    const args = text.split(/\s+/).slice(1);
+    const kind = args[0] ? args[0].toLowerCase() : L.KINDS[Math.floor(Math.random() * L.KINDS.length)];
+    if (L.KINDS.indexOf(kind) < 0) { await say(env, chatId, "Вид: " + L.KINDS.join(", ") + ". Пример: /test last 7"); return new Response("ok"); }
+    const num = parseInt(args[1], 10);
+    const idx = num >= 1 ? num - 1 : Math.floor(Math.random() * 100);
+    const now = Date.now(), today = L.gameDayOf(now);
+    const r = L.textForVariant(kind, L.rollForward(u.s, today), today, idx);
+    await tg(env, "sendMessage", { chat_id: chatId, text: r.text + "\n\n[тест: " + kind + ", вариант " + (r.idx + 1) + "/" + r.n + "]", reply_markup: keyboard(env, kind) });
   } else if (cmd === "/status") {
     const code = await env.STATE.get("c:" + chatId);
     const u = code ? await getUser(env, code) : null;

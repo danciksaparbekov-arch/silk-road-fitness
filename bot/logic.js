@@ -30,9 +30,12 @@ function setExtra(obj){
   });
 }
 function fill(t,vars){return t.replace(/\{(\w+)\}/g,function(m,k){return vars&&Object.prototype.hasOwnProperty.call(vars,k)?String(vars[k]):m;});}
+var FORCE=null, LAST_PICK={i:0,n:1}; // FORCE — номер варианта для команды /test
 function pickText(kind,variants,day,vars){
   var all=variants.concat(EXTRA[kind]||[]);
-  return fill(all[variantIdx(day,all.length)],vars);
+  var i=FORCE!=null?((FORCE%all.length)+all.length)%all.length:variantIdx(day,all.length);
+  LAST_PICK={i:i,n:all.length};
+  return fill(all[i],vars);
 }
 
 function morningText(s,day){
@@ -123,6 +126,13 @@ function textFor(kind,s,day){
   if(kind==='alarm')return alarmText(s,day);
   if(kind==='weekly')return weeklyText(s,day);
   return nudgeText(day);
+}
+
+// Для команды /test: текст вида kind, вариант idx (0..n-1; null = как в обычной отправке). Возвращает {text,idx,n}
+function textForVariant(kind,s,day,idx){
+  FORCE=(typeof idx==='number'&&isFinite(idx))?idx:null;
+  try{var text=textFor(kind,s,day);return {text:text,idx:LAST_PICK.i,n:LAST_PICK.n};}
+  finally{FORCE=null;}
 }
 
 // Текст для команды /status
@@ -243,6 +253,6 @@ function stravaActivityId(ev){
 }
 
 var API={verifySession:verifySession,stravaActivityId:stravaActivityId,validCode:validCode,ttlFor:ttlFor,TTL_LINKED_S:TTL_LINKED_S,TTL_UNLINKED_S:TTL_UNLINKED_S,TZ_OFFSET_H:TZ_OFFSET_H,KINDS:KINDS,SNOOZE_MS:SNOOZE_MS,
-  gameDayOf:gameDayOf,localMinutes:localMinutes,isQuiet:isQuiet,decide:decide,rollForward:rollForward,applySent:applySent,snooze:snooze,statusText:statusText,textFor:textFor,setExtra:setExtra};
+  gameDayOf:gameDayOf,localMinutes:localMinutes,isQuiet:isQuiet,decide:decide,rollForward:rollForward,applySent:applySent,snooze:snooze,statusText:statusText,textFor:textFor,textForVariant:textForVariant,setExtra:setExtra};
 if(typeof module!=='undefined'&&module.exports)module.exports=API;else root.SRBot=API;
 })(typeof globalThis!=='undefined'?globalThis:this);

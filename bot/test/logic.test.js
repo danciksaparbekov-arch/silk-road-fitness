@@ -292,3 +292,15 @@ test('setExtra: новые фразы подмешиваются, плейсхо
     assert.ok([...seen].every(t => !/\{\w+\}/.test(t)));
   } finally { L.setExtra(null); }
 });
+
+test('textForVariant: конкретный вариант по номеру, n и idx, обычный выбор не ломается', () => {
+  const s = { regionName: 'Алматы', miss: 0, isTrainDay: true };
+  const day = '2026-11-10';
+  const base = L.textFor('last', s, day);
+  const a = L.textForVariant('last', s, day, 5);
+  assert.strictEqual(a.idx, 5);
+  assert.ok(a.n >= 6);
+  assert.match(a.text, /Шурпу уже сварили/);
+  assert.strictEqual(L.textForVariant('last', s, day, 5 + a.n).idx, 5); // номер по модулю
+  assert.strictEqual(L.textFor('last', s, day), base); // FORCE сброшен
+});
