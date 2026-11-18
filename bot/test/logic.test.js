@@ -288,7 +288,7 @@ test('setExtra: новые фразы подмешиваются, плейсхо
       seen.add(L.textFor('last', s, day));
     }
     assert.ok(seen.has('Тест-тревога для Алматы!'));
-    assert.ok([...seen].some(t => t.startsWith('Крипер рядом: ночной набег')));
+    assert.ok([...seen].some(t => t.startsWith('Крипер рядом: набег')));
     assert.ok([...seen].every(t => !/\{\w+\}/.test(t)));
   } finally { L.setExtra(null); }
 });
