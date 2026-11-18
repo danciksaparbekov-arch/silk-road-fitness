@@ -52,13 +52,13 @@ test('тихие часы 23:30-07:30', () => {
 test('день тренировки: morning 08:00, courses 20:50, last 22:30', () => {
   const u = mkUser();
   assert.deepStrictEqual(simulate(u, local(...TUE, 7, 0), local(...TUE, 23, 50)),
-    ['08:00 morning', '20:50 courses', '22:30 last']);
+    ['08:00 morning', '20:50 courses', '22:30 last', '23:10 alarm']);
 });
 
 test('день отдыха: morning и last, без courses', () => {
   const u = mkUser({}, { isTrainDay: false });
   assert.deepStrictEqual(simulate(u, local(...TUE, 7, 0), local(...TUE, 23, 50)),
-    ['08:00 morning', '22:30 last']);
+    ['08:00 morning', '22:30 last', '23:10 alarm']);
 });
 
 test('дедупликация: повторный тик в тот же день ничего не шлёт', () => {
@@ -263,4 +263,32 @@ test('validCode: строго 16 символов [a-z0-9]', () => {
   for (const bad of ['', 'abc', 'ABCDEFGHIJ012345', 'abcdefghij01234!', 'abcdefghij0123456', 'abcdefghij012345\n', null, 5, {}, ['abcdefghij012345']]) {
     assert.ok(!L.validCode(bad), String(bad));
   }
+});
+
+test('alarm: 23:10 после last, без кнопки отложить, не шлётся при выполненной норме', () => {
+  const u = mkUser();
+  const m = L.decide(Object.assign(u, { sent: { morning: '2026-11-10', courses: '2026-11-10', last: '2026-11-10' } }), local(...TUE, 23, 10));
+  assert.strictEqual(m.length, 1);
+  assert.strictEqual(m[0].kind, 'alarm');
+  assert.match(m[0].text, /🚨/);
+  assert.ok(!L.snooze(u, 'alarm', local(...TUE, 23, 10)));
+  assert.deepStrictEqual(L.decide(mkUser({}, { normMet: true }), local(...TUE, 23, 10)), []);
+  assert.deepStrictEqual(L.decide(mkUser({}, { truce: true }), local(...TUE, 23, 10)), []);
+});
+
+test('setExtra: новые фразы подмешиваются, плейсхолдеры подставляются, мусор отбрасывается', () => {
+  L.setExtra({ alarm: ['Тест-тревога для {reg}!'], last: ['Крипер рядом: {cons}.'], bogus: ['не вид'], nudge: [123, 'ok'] });
+  try {
+    const s = { regionName: 'Алматы', miss: 0, isTrainDay: true };
+    // перебираем дни, пока не выпадет новая фраза: она должна подставить плейсхолдеры
+    const seen = new Set();
+    for (let d = 1; d <= 28; d++) {
+      const day = '2026-11-' + String(d).padStart(2, '0');
+      seen.add(L.textFor('alarm', s, day));
+      seen.add(L.textFor('last', s, day));
+    }
+    assert.ok(seen.has('Тест-тревога для Алматы!'));
+    assert.ok([...seen].some(t => t.startsWith('Крипер рядом: ночной набег')));
+    assert.ok([...seen].every(t => !/\{\w+\}/.test(t)));
+  } finally { L.setExtra(null); }
 });

@@ -2,6 +2,8 @@
 // Секреты: TELEGRAM_BOT_TOKEN, WEBHOOK_SECRET (wrangler secret put). KV-привязка: STATE.
 // Коды привязки не логируем: код = ключ доступа.
 import L from './logic.js';
+import PHRASES from './phrases.json'; // новые фразы, добавляются раз в неделю (см. PHRASES.md)
+L.setExtra(PHRASES);
 
 const MAX_BODY = 2048;
 const TTL = L.TTL_LINKED_S; // чат привязан: запись живёт 120 дней с последнего обновления (для KV-ключа c:<chat>)
@@ -63,7 +65,7 @@ async function tg(env, method, body) {
 // Кнопки: «+30 мин» (кроме nudge) и ссылка на игру. Кнопки «Сделал» нет: состояние живёт только в приложении.
 function keyboard(env, kind) {
   const row = [];
-  if (kind !== "nudge") row.push({ text: "⏰ +30 мин", callback_data: "snooze:" + kind });
+  if (kind !== "nudge" && kind !== "alarm") row.push({ text: "⏰ +30 мин", callback_data: "snooze:" + kind });
   if (env.GAME_URL) row.push({ text: "Открыть игру", url: env.GAME_URL });
   return { inline_keyboard: [row] };
 }
