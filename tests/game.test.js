@@ -262,3 +262,16 @@ test('проверка часами: finishSession пишет session.verified, 
   SR.finishSession(s2,[{ex:'push_classic',reps:10,ts:0}],MON(),{verified:true});
   assert.equal(s2.sessions[0].verified,true);
 });
+
+test('mergeStates: максимум по разведке и войскам, истории объединяются', () => {
+  const SRm = require('../game.js');
+  const now = new Date('2026-11-23T12:00:00');
+  const a = SRm.fresh(now), b = SRm.fresh(now);
+  a.updatedAt = 100; a.upgrades.scouts = 2; a.army.spear = 5; a.trainDays = ['2026-11-20'];
+  b.updatedAt = 200; b.upgrades.scouts = 0; b.army.spear = 3; b.army.cav = 7; b.trainDays = ['2026-11-22'];
+  const r = SRm.mergeStates(a, b, now);
+  assert.strictEqual(r.upgrades.scouts, 2);
+  assert.strictEqual(r.army.spear, 5);
+  assert.strictEqual(r.army.cav, 7);
+  assert.deepStrictEqual(r.trainDays, ['2026-11-20', '2026-11-22']);
+});

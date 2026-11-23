@@ -152,6 +152,33 @@ function migrate(o,now){
   return f;
 }
 
+/* Слияние двух состояний (для первой синхронизации устройств, где прогресс разошёлся):
+   база — более новое состояние, поверх неё берём максимум по прогрессу и объединяем истории. */
+function mergeStates(a,b,now){
+  a=migrate(a,now);b=migrate(b,now);
+  var newer=(a.updatedAt||0)>=(b.updatedAt||0)?a:b,older=newer===a?b:a;
+  var r=JSON.parse(JSON.stringify(newer));
+  var mx=function(x,y){return Math.max(x||0,y||0);};
+  r.total=mx(a.total,b.total);r.gold=mx(a.gold,b.gold);r.provisions=mx(a.provisions,b.provisions);
+  r.gatePassed=!!(a.gatePassed||b.gatePassed);
+  if(older.region>newer.region){r.region=older.region;r.garrison=JSON.parse(JSON.stringify(older.garrison));}
+  ['army','frac','unlocked'].forEach(function(k){for(var u in r[k])r[k][u]=mx(a[k][u],b[k][u]);});
+  ['walls','healer','scouts'].forEach(function(k){r.upgrades[k]=mx(a.upgrades[k],b.upgrades[k]);});
+  for(var u in r.upgrades.smith)r.upgrades.smith[u]=mx(a.upgrades.smith[u],b.upgrades.smith[u]);
+  ['foodDays','trainDays','restDays'].forEach(function(k){
+    var m={};(a[k]||[]).concat(b[k]||[]).forEach(function(d){m[d]=1;});r[k]=Object.keys(m).sort();
+  });
+  var seen={},ss=[];
+  (a.sessions||[]).concat(b.sessions||[]).forEach(function(x){var id=x.d+'|'+x.start;if(!seen[id]){seen[id]=1;ss.push(x);}});
+  ss.sort(function(p,q){return (p.start||0)-(q.start||0);});r.sessions=ss.slice(-60);
+  var ls={},lg=[];
+  (a.log||[]).concat(b.log||[]).forEach(function(x){var id=x.d+'|'+x.k+'|'+x.t;if(!ls[id]){ls[id]=1;lg.push(x);}});
+  lg.sort(function(p,q){return p.d<q.d?1:p.d>q.d?-1:0;});r.log=lg.slice(0,100);
+  if(r.startWeight==null)r.startWeight=older.startWeight;
+  r.updatedAt=Date.now();
+  return r;
+}
+
 function addLog(s,day,k,t,p){s.log.unshift({d:day,k:k,t:t,p:p||0});if(s.log.length>100)s.log.length=100;}
 function capPush(arr,v,n){arr.push(v);if(arr.length>n)arr.splice(0,arr.length-n);}
 
@@ -548,7 +575,7 @@ Object.assign(SR,{
   UNITS:UNITS,LADS:LADS,LAD_UNIT:LAD_UNIT,UNIT_NAMES:UNIT_NAMES,UNIT_GEN:UNIT_GEN,STATS:STATS,PROV_MAX:PROV_MAX,
   EXERCISES:EXERCISES,EX:EX,LADDERS:LADDERS,REGIONS:REGIONS,CARDS:CARDS,SHOP:SHOP,WALLS_CUT:WALLS_CUT,
   GARRISON_N:GARRISON_N,TEMPLATES:TEMPLATES,FLAG_TEXT:FLAG_TEXT,
-  fresh:fresh,migrate:migrate,spawnGarrison:spawnGarrison,count:count,hpOf:hpOf,
+  fresh:fresh,migrate:migrate,mergeStates:mergeStates,spawnGarrison:spawnGarrison,count:count,hpOf:hpOf,
   isTrainDay:isTrainDay,hasSession:hasSession,planWeek:planWeek,weekSessions:weekSessions,setSettings:setSettings,
   programFor:programFor,canMove:canMove,moveToTomorrow:moveToTomorrow,markRest:markRest,availableEx:availableEx,
   flagSets:flagSets,addSet:addSet,setWatchCheck:setWatchCheck,VERIFY_BONUS:VERIFY_BONUS,calcMods:calcMods,calcSession:calcSession,finishSession:finishSession,unitsText:unitsText,

@@ -11,7 +11,7 @@ const TTL = L.TTL_LINKED_S; // чат привязан: запись живёт 
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
@@ -83,6 +83,24 @@ async function handleSync(request, env, origin) {
   u.s = s;
   u.updatedAt = Date.now();
   await putUser(env, body.code, u);
+  return json({ ok: true }, 200, origin);
+}
+
+// Полное состояние игры для синхронизации между устройствами: KV g:<код>. Код = 16 случайных символов (секрет).
+const MAX_STATE = 200000;
+async function handleState(request, env, origin) {
+  if (request.method === "GET") {
+    const code = new URL(request.url).searchParams.get("code");
+    if (!L.validCode(code)) return json({ error: "bad code" }, 400, origin);
+    const st = await env.STATE.get("g:" + code);
+    return json({ state: st ? JSON.parse(st) : null }, 200, origin);
+  }
+  const raw = await request.text();
+  if (raw.length > MAX_STATE) return json({ error: "too large" }, 413, origin);
+  let body;
+  try { body = JSON.parse(raw); } catch (e) { return json({ error: "bad json" }, 400, origin); }
+  if (!body || !L.validCode(body.code) || !body.state || typeof body.state !== "object" || body.state.v !== 2) return json({ error: "bad request" }, 400, origin);
+  await env.STATE.put("g:" + body.code, JSON.stringify(body.state), { expirationTtl: 31536000 });
   return json({ ok: true }, 200, origin);
 }
 
@@ -263,6 +281,14 @@ export default {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405, originOk ? origin : "");
       if (!originOk) return json({ error: "forbidden origin" }, 403, "");
       return handleSync(request, env, origin);
+    }
+    if (url.pathname === "/state") {
+      if (request.method === "OPTIONS") {
+        return originOk ? new Response(null, { status: 204, headers: corsHeaders(origin) }) : new Response(null, { status: 403 });
+      }
+      if (request.method !== "GET" && request.method !== "POST") return json({ error: "method not allowed" }, 405, originOk ? origin : "");
+      if (!originOk) return json({ error: "forbidden origin" }, 403, "");
+      return handleState(request, env, origin);
     }
     return new Response("silk-road-bot", { status: 200 });
   },

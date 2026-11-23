@@ -61,5 +61,27 @@ function schedule(S){
   timer=setTimeout(function(){send(S);},2000);
 }
 
-root.SRSync={configured:configured,ensureCode:ensureCode,linkUrl:linkUrl,buildPayload:buildPayload,schedule:schedule,send:send};
+// Полное состояние для синхронизации устройств (GET/POST /state на том же Worker)
+var stTimer=null;
+function validCode(c){return typeof c==='string'&&/^[a-z0-9]{16}$/.test(c);}
+function pullState(code){
+  if(!configured()||!validCode(code))return Promise.resolve(null);
+  return fetch(WORKER_URL.replace(/\/+$/,'')+'/state?code='+code).then(function(r){
+    if(!r.ok)throw new Error('http '+r.status);return r.json();
+  }).then(function(j){return j&&j.state||null;});
+}
+function pushState(S){
+  if(!configured()||!validCode(S.settings.linkCode))return Promise.resolve();
+  return fetch(WORKER_URL.replace(/\/+$/,'')+'/state',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code:S.settings.linkCode,state:S}),keepalive:true
+  }).catch(function(){});
+}
+function scheduleState(S){
+  if(!configured()||!validCode(S.settings.linkCode))return;
+  clearTimeout(stTimer);
+  stTimer=setTimeout(function(){pushState(S);},2500);
+}
+
+root.SRSync={validCode:validCode,pullState:pullState,pushState:pushState,scheduleState:scheduleState,configured:configured,ensureCode:ensureCode,linkUrl:linkUrl,buildPayload:buildPayload,schedule:schedule,send:send};
 })(typeof window!=='undefined'?window:this);

@@ -259,6 +259,8 @@ ul.clean,ol.clean{list-style:none;margin:0;padding:0}
         <p class="note" id="truceinfo" style="margin-top:8px"></p>
         <h3 style="margin-top:16px">Напоминания</h3>
         <div id="remind"></div>
+        <h3 style="margin-top:16px">Синхронизация устройств</h3>
+        <div id="cloud"></div>
         <h3 style="margin-top:16px">Резервная копия</h3>
         <div class="row" style="margin-top:8px">
           <button class="ghost" type="button" data-act="export">Экспорт</button>
@@ -312,6 +314,7 @@ var progReps={};            // введённые повторы по ключу
 var summary=[];             // события врага для баннера «Пока тебя не было»
 var viewIdx=null,anim=false,pendingImport=null,lastBattle=null;
 var restEnd=0,restTimer=null;
+var cloudReady=false,MKEY='silkroad.mergedCode';
 var dbRef=null,dbBusy=false,dbDirty=false,dbTimer=null;
 
 function $(id){return document.getElementById(id);}
@@ -324,13 +327,60 @@ function saveDraft(){try{localStorage.setItem(DKEY,JSON.stringify({d:SR.gameDay(
 function save(){
   S.updatedAt=Date.now();
   try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
-  if(window.SRSync)SRSync.schedule(S);
+  if(window.SRSync){SRSync.schedule(S);if(cloudReady)SRSync.scheduleState(S);}
   if(dbRef){dbDirty=true;clearTimeout(dbTimer);dbTimer=setTimeout(flushDb,700);}
 }
 function flushDb(){
   if(dbBusy||!dbDirty||!dbRef)return;
   dbBusy=true;dbDirty=false;
   dbRef.set({state:S}).then(function(){setSync('cloud');},function(){setSync('local');}).then(function(){dbBusy=false;if(dbDirty)flushDb();});
+}
+/* Синхронизация между устройствами через Worker (по коду linkCode).
+   Первое подключение этого устройства к коду — слияние (максимум по прогрессу), дальше побеждает более новое. */
+function keepCode(n,code){if(code){n.settings=n.settings||{};n.settings.linkCode=code;}return n;}
+function cloudSync(){
+  var code=S.settings.linkCode;
+  if(!window.SRSync||!SRSync.configured()||!SRSync.validCode(code))return Promise.resolve();
+  return SRSync.pullState(code).then(function(remote){
+    var merged=false;try{merged=localStorage.getItem(MKEY)===code;}catch(e){}
+    if(remote&&!merged){
+      S=keepCode(SR.mergeStates(S,remote,now()),code);
+      try{localStorage.setItem(MKEY,code);}catch(e){}
+      save();toast('Прогресс объединён с облаком.');
+    }else if(remote&&(remote.updatedAt||0)>(S.updatedAt||0)){
+      S=keepCode(SR.migrate(remote,now()),code);
+      try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+    }else{
+      try{localStorage.setItem(MKEY,code);}catch(e){}
+      SRSync.pushState(S);
+    }
+    cloudReady=true;runEnemy();render();
+  }).catch(function(){});
+}
+function renderCloud(){
+  var el=$('cloud');if(!el)return;
+  if(!window.SRSync||!SRSync.configured()){el.innerHTML='';return;}
+  var code=S.settings.linkCode,h='';
+  if(SRSync.validCode(code)){
+    h+='<p class="note">Код этого прогресса: <b>'+esc(code)+'</b>. Введи его на другом устройстве, и прогресс станет общим.</p>';
+  }else{
+    h+='<p class="note">Чтобы прогресс был общим на телефоне и компьютере, включи синхронизацию, а на втором устройстве введи тот же код.</p>'+
+       '<div class="row" style="margin-top:8px"><button class="ghost" type="button" data-act="cloudon">Включить синхронизацию</button></div>';
+  }
+  h+='<div class="row" style="margin-top:8px"><input id="cloudcode" type="text" maxlength="16" placeholder="код с другого устройства" autocomplete="off" style="flex:1;min-width:0"> <button class="ghost" type="button" data-act="cloudjoin">Подключить</button></div>';
+  el.innerHTML=h;
+}
+function cloudOn(){
+  SRSync.ensureCode(S);save();
+  try{localStorage.removeItem(MKEY);}catch(e){}
+  cloudSync().then(function(){renderCloud();toast('Синхронизация включена.');});
+}
+function cloudJoin(){
+  var c=String($('cloudcode').value||'').trim().toLowerCase();
+  if(!SRSync.validCode(c)){toast('Код: 16 символов, латиница и цифры.');return;}
+  S.settings.linkCode=c;save();
+  try{localStorage.removeItem(MKEY);}catch(e){}
+  cloudSync().then(function(){renderCloud();});
 }
 async function initDb(){
   try{
@@ -726,7 +776,7 @@ function renderLog(){
   $('resetbox').innerHTML='<button class="warn" type="button" data-act="reset1">Сбросить кампанию</button>';
 }
 function render(){
-  renderStats();renderSummary();renderToday();renderMap();renderBattle();renderSession();renderForge();renderCamp();renderWeekCard();renderSettings();renderRemind();renderRoute();renderLog();
+  renderStats();renderSummary();renderToday();renderMap();renderBattle();renderSession();renderForge();renderCamp();renderWeekCard();renderSettings();renderRemind();renderCloud();renderRoute();renderLog();
 }
 
 /* ---------- События ---------- */
@@ -748,6 +798,8 @@ document.addEventListener('click',function(e){
   else if(a==='move')moveDay();
   else if(a==='truce')truce();
   else if(a==='tglink')connectTg();
+  else if(a==='cloudon')cloudOn();
+  else if(a==='cloudjoin')cloudJoin();
   else if(a==='watch'){SR.setWatchCheck(S,b.checked);save();toast(b.checked?'Проверка часами включена.':'Проверка часами выключена.');}
   else if(a==='gotruce'){var sc=$('settingscard');sc.scrollIntoView({behavior:'smooth',block:'start'});$('truced').focus();}
   else if(a==='sumok'){summary=[];renderSummary();}
@@ -782,6 +834,7 @@ $('wsave').addEventListener('click',saveWeight);
 runEnemy();
 render();
 initDb();
+cloudSync().then(renderCloud);
 if(window.SRSync)SRSync.schedule(S);
 })();
 </script>
