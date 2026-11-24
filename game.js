@@ -42,8 +42,6 @@ var EXERCISES=[
  {id:'bulgarian',n:'Болгарские сплит-приседания (на ногу)',lad:'squat',k:1.1,t:12},
  {id:'pistol',n:'Пистолет с опорой (на ногу)',lad:'squat',k:1.8,t:10},
  {id:'row_bp',n:'Тяга рюкзака в наклоне',lad:'pull',k:1.2,t:15},
- {id:'row_table',n:'Тяга под столом',lad:'pull',k:2,t:12},
- {id:'pull_band',n:'Подтягивания с резинкой',lad:'pull',k:2.5,t:10},
  {id:'pull_neg',n:'Негативные подтягивания (5 с вниз)',lad:'pull',k:3,t:5},
  {id:'pullup',n:'Подтягивания',lad:'pull',k:3.5,t:8},
  {id:'crunch',n:'Скручивания',lad:'core',k:0.5,t:25},
@@ -56,7 +54,7 @@ var EX={};EXERCISES.forEach(function(e){EX[e.id]=e;});
 var LADDERS=[
  {id:'push',name:'Отжимания',tiers:[{ex:'push_classic'},{ex:'push_diamond',r:12},{ex:'push_feet',r:10},{ex:'push_pause',r:8},{ex:'push_archer',r:8}]},
  {id:'squat',name:'Ноги',tiers:[{ex:'squat_bp'},{ex:'lunge',r:15},{ex:'bulgarian',r:12},{ex:'pistol',r:10}]},
- {id:'pull',name:'Тяга и спина',tiers:[{ex:'row_bp'},{ex:'row_table',r:12},{ex:'pull_band',r:10},{ex:'pullup',req:'5 строгих подтягиваний подряд'}]},
+ {id:'pull',name:'Тяга и спина',tiers:[{ex:'row_bp'},{ex:'pull_neg',r:15},{ex:'pullup',req:'5 строгих подтягиваний подряд'}]},
  {id:'core',name:'Корпус',tiers:[{ex:'crunch'},{ex:'legraise',r:15},{ex:'plank',r:15},{ex:'plank_tap',req:'планка 3×60 с'}]}
 ];
 // Всегда доступны в свободном режиме, но не входят в Кузницу
@@ -214,8 +212,8 @@ function buildWorkout(s,w){
       ex(pushEx,4,8,15),ex('bulgarian',3,8,12),ex('row_bp',3,10,15),ex('plank',3,3,6)];
     items[0].rest=120;items[1].rest=120;items[2].rest=90;items[3].rest=90;items[4].rest=60;
   }else{
-    items=[pullupOn?ex('pullup',4,1,8,{max:true}):ex('pull_band',4,5,8),
-      ex('pike',3,6,12),ex('row_table',3,8,12),ex('squat_bp',4,12,20),ex('legraise',3,10,15)];
+    items=[pullupOn?ex('pullup',4,1,8,{max:true}):ex('pull_neg',4,3,5),
+      ex('pike',3,6,12),ex('row_bp',3,8,12),ex('squat_bp',4,12,20),ex('legraise',3,10,15)];
     items[0].rest=120;items[1].rest=120;items[2].rest=90;items[3].rest=90;items[4].rest=60;
   }
   return items;

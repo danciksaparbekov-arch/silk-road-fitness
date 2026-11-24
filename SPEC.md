@@ -43,22 +43,20 @@ Exercise catalog (replaces LADDERS tiers; Forge still unlocks within each ladder
 | push_feet | Ноги на возвышении | push | 1.5 | повт |
 | push_pause | Пауза 2 с внизу | push | 1.8 | повт |
 | push_archer | Лучник | push | 2.4 | повт |
-| pike | Пайк-отжимания (плечи) | push | 1.6 | повт — always available, not in Forge |
+| pike | Пайк-отжимания (плечи) | push | 1.6 | повт |
 | squat_bp | Приседания с рюкзаком | squat | 0.7 | повт |
 | lunge | Выпады на месте | squat | 0.7 | повт |
 | bulgarian | Болгарские сплит-приседания (на ногу) | squat | 1.1 | повт |
 | pistol | Пистолет с опорой (на ногу) | squat | 1.8 | повт |
 | row_bp | Тяга рюкзака в наклоне | pull | 1.2 | повт |
-| row_table | Тяга под столом | pull | 2 | повт |
-| pull_band | Подтягивания с резинкой | pull | 2.5 | повт |
-| pull_neg | Негативные подтягивания (5 с вниз) | pull | 3 | повт — always available, not in Forge |
+| pull_neg | Негативные подтягивания (5 с вниз) | pull | 3 | повт |
 | pullup | Подтягивания | pull | 3.5 | повт |
 | crunch | Скручивания | core | 0.5 | повт |
 | legraise | Подъём ног лёжа | core | 0.8 | повт |
 | plank | Планка | core | 1 | 10 с = 1 |
 | plank_tap | Планка с касанием плеч | core | 1.4 | 10 с = 1 |
 Forge ladders: push=[classic,diamond,feet,pause,archer], squat=[squat_bp,lunge,bulgarian,pistol] (squat_bp unlocked at 0),
-pull=[row_bp,row_table,pull_band,pullup], core=[crunch,legraise,plank,plank_tap]. Tests text as before; pullup test = «5 строгих подтягиваний подряд».
+pull=[row_bp,pull_neg,pullup], core=[crunch,legraise,plank,plank_tap]. Tests text as before; pullup test = «5 строгих подтягиваний подряд».
 Free-mode set entry allows any unlocked Forge exercise + pike + pull_neg. Program items are always allowed (program overrides locks).
 Migrate `unlocked` indices: squat 0→0 (squat_bp replaces plain squats), others map 1:1.
 
@@ -102,7 +100,7 @@ On weekdays (Mon–Fri) show the **short** version = first 4 items; on Sat/Sun t
 Deload: every 6th week since `plan.weekStart` → sets halved (ceil).
 - **A:** 1) pull: `pull_neg` 4×3 (if pullup unlocked → `pullup` 4×max) · 2) push main = current Forge push tier 4×8–15 ·
   3) `bulgarian` 3×8–12/нога · 4) `row_bp` 3×10–15 · 5) `plank` 3×3–6 (30–60 с)
-- **B:** 1) `pull_band` 4×5–8 (if pullup unlocked → `pullup` 4×max) · 2) `pike` 3×6–12 · 3) `row_table` 3×8–12 ·
+- **B:** 1) `pull_neg` 4×3–5 (if pullup unlocked → `pullup` 4×max) · 2) `pike` 3×6–12 · 3) `row_bp` 3×8–12 ·
   4) `squat_bp` 4×12–20 · 5) `legraise` 3×10–15
 Rest between sets: pull/push main 120 s, others 90 s, core 60 s.
 «Сегодня» card: training day → workout list; each set is a row with reps input prefilled with the range top, a «✓» button
